@@ -1,0 +1,29 @@
+My Mechanical Mathematical System (whatever it really means ....)
+
+This is basically a set of libraries, which allows one to
+*) define data-structure and algorithm on them (calculus)
+*) execute efficiently the algorithm (comp)
+*) from a well-known interactive setup (interactive)
+
+interactive := python
+calculus := some extention/variant of CiC, implemented in Ocaml
+comp := LLVM back-end
+
+the principle is to keep strength of all the component of the system while annihilating their weakness (by its counter strength)
+
+python := 
+* pro: easy to handle value, lots of library for several features (distribution, ...)
+* cons: uneasy to write algo (no static type checking), unefficient
+
+calculus :=
+* pro: great expressiveness, dependant type checking
+* cons: interpreter remains slow, no easy way to inter data by hands (needs outside world for entry)
+
+LLVM :=
+* pro: efficient JIT native code compilation & native code generation + several optimization path + several available back end
+* cons: no easy way to interactively create code, low-level memory management
+
+python + calculus + LLVM :=
+- easy to handle value, lots of library for several external features
+- great expressiveness, static type checking
+- efficent execution, stand alone native code generation, possibility to interface with several exec. devices (FPGA, CUDA, ...)
