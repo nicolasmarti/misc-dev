@@ -17,6 +17,8 @@ from types import *
 from datetime import *
 from string import join
 
+import pickle
+
 # A simple HTML table parser. It turns tables (including nested tables) into arrays
 # Nigel Sim <nigel.sim@gmail.com>
 # http://simbot.wordpress.com
@@ -227,13 +229,15 @@ def get_quote_table(link):
     p.feed(tables[0])
     return p.doc[0][1:]
 
-def get_historical(ticker, startdate, enddate = date.today()):
+def get_historical(ticker, startdate, enddate = date.today(), filename = None):
     
     res = []
     
     i = 0
 
-    while True:
+    cont = True
+
+    while cont:
         try:
             link = buildlink(ticker, startdate, enddate, i*50)
             quotes = get_quote_table(link)
@@ -241,7 +245,10 @@ def get_historical(ticker, startdate, enddate = date.today()):
             i += 1
         except Exception as e:
             #print e
-            return res
+            cont = False
+
+    if filename <> None:
+        pickle.dump(res, open(filename, 'wb'))
 
     return res
 
