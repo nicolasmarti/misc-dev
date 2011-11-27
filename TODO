@@ -1,0 +1,9 @@
+core/calculus:
+1) add an oracle repo for fushing of fvar
+2) add the oracle for typeclass and instance
+3) add definitions of typeclass and instance + code gen + oracle registration
+4) add primitives registration (uuid + parser + pprinter) 
+5) add few primitives: int, float, ...
+
+comp:
+... everything
