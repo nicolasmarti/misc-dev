@@ -14,7 +14,10 @@ import pango
 from sets import *
 import keybinding
 
-import Doudou
+try:
+    import Doudou
+except:
+    None
 
 def error_dialog(parent, msg):
     dialog = gtk.MessageDialog(parent,
@@ -160,15 +163,14 @@ class PG(gtksourceview2.View, keybinding.KeyBinding):
         text = self.buffer.get_text(startiter, enditer)
         if text == "": return
         # proceed the term
-        res = Doudou.proceed(text)
-        if res == None: return
-        if isinstance(res, str): 
-            print res
-            error_dialog(self.get_toplevel(), res)
+        try:
+            res = Doudou.proceed(text)
+        except Exception as e:
+            error_dialog(self.get_toplevel(), str(e))
             return
-
+        
         # update starting position         
-        endpos = startpos + res[0]
+        endpos = startpos + res
         self.startpos.append(endpos)
 
         enditer = self.buffer.get_iter_at_offset(endpos)
@@ -197,11 +199,12 @@ class PG(gtksourceview2.View, keybinding.KeyBinding):
     def undo(self):
         if len(self.startpos) == 1: return
         # calling the undo
-        res = Doudou.undo()
-        if isinstance(res, str): 
-            print res
-            error_dialog(self.get_toplevel(), res)
+        try:
+            Doudou.undo()
+        except Exception as e:
+            error_dialog(self.get_toplevel(), str(e))
             return
+        
         # poping the last starting position
         oldendpos = self.startpos.pop()
 

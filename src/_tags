@@ -3,8 +3,5 @@
 <core/interp>: include
 <core/comp>: include
 
-<core/interp/interp.{ml,byte,native}>: pkg_opycaml
-<core/app/mymms.{ml,byte,native}>: pkg_str, pkg_opycaml
-
-<core/interp/interp2.{ml,byte,native}>: pkg_pycaml
-<core/app/mymms2.{ml,byte,native}>: pkg_str, pkg_pycaml
+<core/interp/interp.{ml,byte,native}>: pkg_pycaml
+<core/app/mymms.{ml,byte,native}>: pkg_str, pkg_pycaml

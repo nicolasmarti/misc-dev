@@ -1,11 +1,9 @@
 open Def
 open Interp
-open Opycaml.Api
+open Pycaml
 
 let main () = 
-  Base.initialize ();
-  init_interp ();  
-  ignore (Base.main []);
-  Base.finalize ();;
+  init_interp ();
+  pymain Sys.argv;;
 
 main ()

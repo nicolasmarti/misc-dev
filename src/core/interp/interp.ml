@@ -1,4 +1,5 @@
-open Opycaml.Api
+open Pycaml
+
 open Def
 open Misc
 open Pprinter
@@ -46,37 +47,28 @@ let register (te: term) : int =
 let marshal_doudou_python createValue te =
   let id = register te in
   if !debug then printf "registered %s (%d)\n" (term2string !ctxt te) id;
-  let res = Object.call createValue [Object.obj (Int.fromLong id)] in
+  let res = pycallable_asfun createValue [| pyint_fromint id |] in
   if !debug then printf "created Value for id %d\n" id;
   res
 
 let marshal_python_doudou valueClass value =
-  try
-    let isValue = Object.isInstance value valueClass in
-    if isValue then
-      let id_object = Object.getAttr value (Py.String.fromString "id") in
-      let id = Int.asLong (Int.coerce id_object) in
-      if not (Hashtbl.mem registry id) then
-	None
-      else
-	let (te, _) = Hashtbl.find registry id in
-	Some te        
+  let isValue = pyobject_isinstance (value, valueClass) in
+  if isValue = 1 then
+    let id_object = pyobject_getattr (value, pystring_fromstring "id") in
+    let id = pyint_asint id_object in
+    if not (Hashtbl.mem registry id) then
+      raise (Failure "marshal_python_doudou: unknown id")
     else
-      None
-  with
-    | _ -> None
+      let (te, _) = Hashtbl.find registry id in
+      te        
+  else
+    raise (Failure "marshal_python_doudou: only marshaling of Value instance for now ...")
+
 
 (***************************************************************)
 
-let init_interp () =
-
-  (*
-    we need a python class that represents Doudou values
-    c.f. http://docs.python.org/reference/datamodel.html#basic-customization
-
-  *)
-
-  let _ = Run.simpleString "class Value:
+let init_interp () = 
+  let _ = python_exec "class Value:
      # just register the id
      # the id should be already registered in ocaml
      def __init__(self, id):
@@ -101,8 +93,8 @@ let init_interp () =
          return Doudou.apply(self.id, args)
 
      # size of the term (1 + number of explicite arguments)
-     def __len__(self):
-         return Doudou.length(self.id)
+     # def __len__(self):
+     #    return Doudou.length(self.id)
 
 def createValue(id):
     return Value(id)
@@ -111,289 +103,180 @@ def createValue(id):
 
   " in
 
-  (* building Doudou module *)
-  let mdl = Module.new_ "Doudou" in
-  let mdldic = Import.getModuleDict () in
-  Dict.setItemString mdldic "Doudou" mdl;
+  let mdl = pyimport_addmodule "Doudou" in
+  let doudou_dict = pymodule_getdict mdl in
+ 
+  let value_class = python_eval "Value" in
+  let createValue_function = python_eval "createValue" in
 
-  let doudou_dict = Module.getDict mdl in
+  let _ = pydict_setitemstring (doudou_dict, "Type", marshal_doudou_python value_class (Type nopos)) in
 
-  (* grabing Value *)
-  let main_mdl = Import.importModule "__main__" in
-  let main_dict = Module.getDict main_mdl in
-  let value_class = unsafe_coerce (Dict.getItemString main_dict "Value") in
+  (***************************************************)
 
-  let createValue_function = Callable.coerce (Dict.getItemString main_dict "createValue") in
-
-  (* filling the module *)
-  (*
-    Module.setClosureString : [>_Module] t -> string -> ([>_Tuple] t -> _Object t) -> unit
-    Module.setItemString : [>_Module] t -> string -> [>_Object] t -> unit
-  *)
-
-  Module.setItemString mdl "Type"
-    (marshal_doudou_python value_class (Type nopos));
-
-  (*show_registry ();*)
-
-  (*  *)
-  Module.setClosureString mdl "apply"
+  let _ = 
+  python_interfaced_function 
+    ~register_as:"Doudou.apply"
+    ~docstring:"application of a registered term with python arguments"
+    [|IntType; TupleType|]
     (fun args ->
-      try(
-	let args = Tuple.to_list args in
-	match args with
-	  | id::args::[] when Number.check id && Tuple.check args -> (
-	    let id = Int.asLong (Int.coerce id) in	    
-	    if not (Hashtbl.mem registry id) then (
-	      if !debug then printf "apply(1)\n";
-	      Object.obj (Base.none ())
-	    )
-	    else (
-	      let args = Tuple.to_list (Tuple.coerce args) in
-	      let rev_args = List.fold_left (fun acc hd -> 
-		match acc with
-		  | None -> if !debug then printf "apply(2)\n"; None
-		  | Some acc -> 
-		    match marshal_python_doudou value_class hd with
-		      | None -> if !debug then printf "apply(3)\n"; None
-		      | Some te ->
-			Some (te::acc)
-	      ) (Some []) args in	      
-	      match rev_args with
-		| None -> (
-		  Object.obj (Base.none ())
-		)
-		| Some l ->
-		  let args = List.rev l in
-		  let te = App (
-		    fst (Hashtbl.find registry id),
-		    List.map (fun hd -> (hd, Explicit)) args,
-		    nopos
-		  ) in
-		  let saved_ctxt = !ctxt in
-		  let saved_defs = copy_defs !defs in
-		  (*if verbose then printf "input:\n%s\n" str;*)
-		  try
-		    (* we infer the term type *)
-		    let te, ty = typeinfer !defs ctxt te in
-		    if !debug then printf "typechecked application\n";
-		    let te = reduction !defs ctxt clean_term_strat te in
-		    if !debug then printf "reduced results\n";
-		    let pte = marshal_doudou_python createValue_function te in
-		    if !debug then printf "marshalled results\n";
-		    pte
-		  with
-		    (* TODO: return proper python exception *)
-		    | DoudouException err -> 
-		      (* we restore the context and defs *)
-		      ctxt := saved_ctxt;
-		      defs := saved_defs;
-		      if !debug then printf "apply(4)\n"; 
-		      Object.obj (Base.none ())
-		    | Failure s -> 
-		      ctxt := saved_ctxt;
-		      defs := saved_defs;
-		      if !debug then printf "apply(6): %s\n" s; 
-		      Object.obj (Base.none ())
-		    | _ -> 
-		      ctxt := saved_ctxt;
-		      defs := saved_defs;
-		      if !debug then printf "apply(5)\n"; 
-		      Object.obj (Base.none ())
-
-	    )
+      match args with
+	| [| id; args |] ->
+	  let id = pyint_asint id in
+	  if not (Hashtbl.mem registry id) then (
+	    raise (Failure "Doudou.apply: unknown id")
 	  )
-	  | _ -> 
-	    Object.obj (Base.none ())
-      )
-      with
-	| _ -> 
-	  Object.obj (Base.none ())
-
-    );
-
-  Module.setClosureString mdl "to_string"
-    (fun args ->
-      try(
-	let args = Tuple.to_list args in
-	match args with
-	  | id::[] when Number.check id -> (
-	    let id = Int.asLong (Int.coerce id) in	    
-	    if not (Hashtbl.mem registry id) then (
-	      Object.obj (Base.none ())
-	    )
-	    else (
-	      Object.obj (Py.String.fromString (term2string !ctxt (fst (Hashtbl.find registry id))))
-	    )
-	    )
-	  | _ -> 
-	    Object.obj (Base.none ())
-      )
-      with
-	| _ -> 
-	  Object.obj (Base.none ())
-
-    );
-
-  Module.setClosureString mdl "type"
-    (fun args ->
-      try(
-	let args = Tuple.to_list args in
-	match args with
-	  | id::[] when Number.check id -> (
-	    let id = Int.asLong (Int.coerce id) in	    
-	    if not (Hashtbl.mem registry id) then (
-	      Object.obj (Base.none ())
-	    )
-	    else (	      
-	      let te = fst (Hashtbl.find registry id) in
-	      let _, ty = typeinfer !defs ctxt te in
-	      marshal_doudou_python value_class ty
-	    )
-	  )
-	  | _ -> 
-	    Object.obj (Base.none ())
-      )
-      with
-	| _ -> 
-	  Object.obj (Base.none ())	    
-    );
-
-  Module.setClosureString mdl "length"
-    (fun args ->
-      try(
-	let args = Tuple.to_list args in
-	match args with
-	  | id::[] when Number.check id -> (
-	    let id = Int.asLong (Int.coerce id) in	    
-	    if not (Hashtbl.mem registry id) then (
-	      Object.obj (Base.none ())
-	    )
-	    else (
-	      let te = fst (Hashtbl.find registry id) in
-	      let len = match te with
-		| App (_, l, _) ->
-		  1 + List.length (filter_explicit l)
-		| _ -> 1 
-	      in
-	      Object.obj (Int.fromLong len)
-	    )
-	    )
-	  | _ -> 
-	    Object.obj (Base.none ())
-      )
-      with
-	| _ -> 
-	  Object.obj (Base.none ())
-
-    );
-
-  Module.setClosureString mdl "decref"
-    (fun args ->
-      try(
-	let args = Tuple.to_list args in
-	match args with
-	  | id::[] when Number.check id -> (
-	    let id = Int.asLong (Int.coerce id) in
-	    if !debug then printf "decref of %d\n" id;
-	    if not (Hashtbl.mem registry id) then
-	      Object.obj (Base.none ())
-	    else
-	      let (value, refcounter) = Hashtbl.find registry id in
-	      let _ = if refcounter = 1 then
-		  Hashtbl.remove registry id		    
-		else
-		  Hashtbl.replace registry id (value, refcounter - 1) in
-	      Object.obj (Base.none ())
-	    )
-	  | _ -> Object.obj (Base.none ())
-      )
-      with
-	| _ -> Object.obj (Base.none ())
-
-    );
-
-  (* enter a doudou definition *)
-  Module.setClosureString mdl "proceed"
-    (fun args ->
-      try(
-	let args = Tuple.to_list args in
-	match args with
-	  | str::_ when Py.String.check str -> (
-	    let str = Py.String.asString (Py.String.coerce str) in
-	    (* we set the parser *)
-	    let lines = stream_of_string str in
-	    (* we save the context and the defs *)
+	  else (
+	    let args = pytuple_toarray args in
+	    let args = Array.map (fun arg -> marshal_python_doudou value_class arg) args in
+	    let te = App (
+	      fst (Hashtbl.find registry id),
+	      List.map (fun hd -> (hd, Explicit)) (Array.to_list args),
+	      nopos) in
 	    let saved_ctxt = !ctxt in
 	    let saved_defs = copy_defs !defs in
-	    (*if verbose then printf "input:\n%s\n" str;*)
-	    let pb = build_parserbuffer lines in
 	    try
-	      let (consumed, def) = parse_onedefinition !defs pb in
-	      let symbs = process_definition ~verbose:false defs ctxt def in
-	      let o = Object.obj (Base.none ()) in
-	      let consumed = Int.fromLong consumed in
+	      (* we infer the term type *)
+	      let te, ty = typeinfer !defs ctxt te in
+	      let te = reduction !defs ctxt clean_term_strat te in
+	      let pte = marshal_doudou_python createValue_function te in
+	      pte
+	    with
+	      | DoudouException err -> 
+		(* we restore the context and defs *)
+		ctxt := saved_ctxt;
+		defs := saved_defs;
+		raise (Failure (error2string err))
+	      | Failure s -> 
+		ctxt := saved_ctxt;
+		defs := saved_defs;
+		raise (Failure s)
+	      | _ -> 
+		ctxt := saved_ctxt;
+		defs := saved_defs;
+		raise (Failure "Doudou.apply: unknown exception")
+	  )
+	    
+	| _ -> raise (Failure "Doudou.apply: wrong arguments")
+    ) in
 
-	      let _ = List.map (fun symb ->
-		let s = (symbol2string symb) in
-		(*printf "registering %s\n" s;*)
-		let te = Cste (symb, nopos) in
-		try 
-		  let pte = marshal_doudou_python createValue_function te in
-		  Module.setItemString mdl s pte;
-		  (*printf "registered %s\n" s*)
-		with
-		  | _ -> (*printf "failed registerig %s\n" s; flush Pervasives.stdout;*) ()
-	      ) symbs in
-	
-	      Object.obj (Tuple.from_list [Object.obj consumed; o])	    
+  let _ = 
+  python_interfaced_function 
+    ~register_as:"Doudou.to_string"
+    ~docstring:"returns string representation of a registered term"
+    [|IntType|]
+    (fun [| id |] ->
+      let id = pyint_asint id in
+      if not (Hashtbl.mem registry id) then (
+	raise (Failure "Doudou.apply: unknown id")
+      )
+      else (
+	pystring_fromstring (term2string !ctxt (fst (Hashtbl.find registry id)))
+      )
+    ) in
+
+  let _ = 
+  python_interfaced_function 
+    ~register_as:"Doudou.type"
+    ~docstring:"returns the type of a registered term"
+    [|IntType|]
+    (fun [| id |] ->
+      let id = pyint_asint id in
+      if not (Hashtbl.mem registry id) then (
+	raise (Failure "Doudou.type: unknown id")
+      )
+      else (
+	let te = fst (Hashtbl.find registry id) in
+	let _, ty = typeinfer !defs ctxt te in
+	marshal_doudou_python value_class ty
+      )
+    ) in
+
+  let _ = 
+  python_interfaced_function 
+    ~register_as:"Doudou.decref"
+    ~docstring:"decrement the ref. counter of a registered term"
+    [|IntType|]
+    (fun [| id |] ->
+      let id = pyint_asint id in
+      if not (Hashtbl.mem registry id) then (
+	raise (Failure "Doudou.decref: unknown id")
+      )
+      else (
+	let (value, refcounter) = Hashtbl.find registry id in
+	let _ = if refcounter = 1 then
+	    Hashtbl.remove registry id		    
+	  else
+	    Hashtbl.replace registry id (value, refcounter - 1) in
+	pynone ()
+      )
+    ) in
+
+  let _ =
+    python_interfaced_function 
+      ~register_as:"Doudou.proceed"
+      ~docstring:"enter a definition"
+      [|StringType|]
+      (fun [| str |] ->
+	let str = pystring_asstring str in
+	(* we set the parser *)
+	let lines = stream_of_string str in
+	(* we save the context and the defs *)
+	let saved_ctxt = !ctxt in
+	let saved_defs = copy_defs !defs in
+	(*if verbose then printf "input:\n%s\n" str;*)
+	let pb = build_parserbuffer lines in
+	try
+	  let (consumed, def) = parse_onedefinition !defs pb in
+	  let symbs = process_definition ~verbose:false defs ctxt def in
+	  let consumed = pyint_fromint consumed in
+	  let _ = List.map (fun symb ->
+	    let s = (symbol2string symb) in
+	    (*printf "registering %s\n" s;*)
+	    let te = Cste (symb, nopos) in
+	    try 
+	      let pte = marshal_doudou_python createValue_function te in
+	      let _ = pydict_setitemstring (doudou_dict, s, pte) in
+	      ()
+	    with
+	      | _ -> (*printf "failed registerig %s\n" s; flush Pervasives.stdout;*) ()
+	  ) symbs in
+	  consumed
 	    with
 	      (* TODO: return proper python exception *)
 	      | NoMatch -> 
-		printf "parsing error: '%s'\n%s\n" (Buffer.contents pb.bufferstr) (errors2string pb);
-		Object.obj (Py.String.fromString (errors2string pb))
+		raise (Failure (String.concat "\n" ["parsing error in:"; Buffer.contents pb.bufferstr; errors2string pb]))
 	      | DoudouException err -> 
 	      (* we restore the context and defs *)
 		ctxt := saved_ctxt;
 		defs := saved_defs;
-		printf "error:\n%s\n" (error2string err); flush Pervasives.stdout;
-		Object.obj (Py.String.fromString (error2string err))
-	  )
-	  | _ -> Object.obj (Base.none ())
-      )
-      with
-	| _ -> Object.obj (Base.none ())
+		raise (Failure (error2string err))
+      ) in
 
-    );
-
-  (* undo last definition *)
-  Module.setClosureString mdl "undo"
-    (fun args ->
+  let _ = 
+  python_interfaced_function 
+    ~register_as:"Doudou.undo"
+    ~docstring:"undo last defs"
+    [||]
+    (fun [| |] ->
       try 
 	let symbs = undoDefinition defs in
 	let _ = List.map (fun symb ->
 	  let s = symbol2string symb in
 	  try 
-	    Dict.delItemString doudou_dict s
+	    let _ = pydict_delitemstring (doudou_dict, s) in
+	    ()
 	  with
 	    | _ -> (*printf "failed unregisterig %s\n" s; flush Pervasives.stdout;*) ()
 	) symbs in
-	Object.obj (Base.none ())
+	pynone ()
       with
 	| DoudouException err -> 
 	  (* we restore the context and defs *)
-	  printf "error:\n%s\n" (error2string err); flush Pervasives.stdout;
-	  Object.obj (Py.String.fromString (error2string err))
-    );
+	  raise (Failure (error2string err))
 
-  (* show definitions *)
-  Module.setClosureString mdl "showdefs"
-    (fun args ->
-      let s = defs2string !defs in
-      Object.obj (Py.String.fromString s)
-    );
-
-
-  (* importing Lisp module *)
-  let _ = Run.simpleString "import Doudou" in
+    ) in
+  
+  (***************************************************)
+  
+  let _ = python_exec "import Doudou" in
   ()
