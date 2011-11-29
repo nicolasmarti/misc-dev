@@ -1,22 +1,22 @@
-open Pycaml
+open Pycaml;;
 
-open Def
-open Misc
-open Pprinter
-open Printf
-open Engine
-open Libparser
-open Parser
-open Entry
-open Context
+open Def;;
+open Misc;;
+open Pprinter;;
+open Printf;;
+open Engine;;
+open Libparser;;
+open Parser;;
+open Entry;;
+open Context;;
 
-let defs = ref (empty_defs ())
+let defs = ref (empty_defs ());;
 
-let ctxt = ref empty_context
+let ctxt = ref empty_context;;
 
-let pyobject_registry : (int, (term * int)) Hashtbl.t = Hashtbl.create 100
+let pyobject_registry : (int, (term * int)) Hashtbl.t = Hashtbl.create 100;;
 
-let debug = ref false
+let debug = ref false;;
 
 let show_pyobject_registry () =
   (* iter : ('a -> 'b -> unit) -> ('a, 'b) t -> unit *)
@@ -25,6 +25,7 @@ let show_pyobject_registry () =
     printf "%d: %s, %d\n" id s rc; flush Pervasives.stdout;    
   ) pyobject_registry;
     printf "\n\n"; flush Pervasives.stdout
+;;
 
 let register (te: term) : int =  
   let id = Hashtbl.hash te in
@@ -43,6 +44,7 @@ let register (te: term) : int =
   ) else   
     let _ = Hashtbl.add pyobject_registry id (te, 1) in
     id  
+;;
 
 let marshal_doudou_python createValue te =
   let id = register te in
@@ -50,6 +52,7 @@ let marshal_doudou_python createValue te =
   let res = pycallable_asfun createValue [| pyint_fromint id |] in
   if !debug then printf "created Value for id %d\n" id;
   res
+;;
 
 let marshal_python_doudou valueClass value =
   let isValue = pyobject_isinstance (value, valueClass) in
@@ -63,12 +66,11 @@ let marshal_python_doudou valueClass value =
       te        
   else
     raise (Failure "marshal_python_doudou: only marshaling of Value instance for now ...")
-
+;;
 
 (***************************************************************)
 
-let init_interp () = 
-  let _ = python_exec "class Value:
+let _ = python_exec "class Value:
      # just register the id
      # the id should be already registered in ocaml
      def __init__(self, id):
@@ -101,19 +103,19 @@ def createValue(id):
 
 
 
-  " in
+  ";;
 
-  let mdl = pyimport_addmodule "Doudou" in
-  let doudou_dict = pymodule_getdict mdl in
+let mdl = pyimport_addmodule "Doudou";;
+let doudou_dict = pymodule_getdict mdl;;
  
-  let value_class = python_eval "Value" in
-  let createValue_function = python_eval "createValue" in
+let value_class = python_eval "Value";;
+let createValue_function = python_eval "createValue";;
 
-  let _ = pydict_setitemstring (doudou_dict, "Type", marshal_doudou_python value_class (Type nopos)) in
+let _ = pydict_setitemstring (doudou_dict, "Type", marshal_doudou_python value_class (Type nopos));;
 
-  (***************************************************)
+(***************************************************)
 
-  let _ = 
+let _ = 
   python_interfaced_function 
     ~register_as:"Doudou.apply"
     ~docstring:"application of a registered term with python arguments"
@@ -157,9 +159,10 @@ def createValue(id):
 	  )
 	    
 	| _ -> raise (Failure "Doudou.apply: wrong arguments")
-    ) in
+    )
+;;
 
-  let _ = 
+let _ = 
   python_interfaced_function 
     ~register_as:"Doudou.to_string"
     ~docstring:"returns string representation of a registered term"
@@ -172,9 +175,10 @@ def createValue(id):
       else (
 	pystring_fromstring (term2string !ctxt (fst (Hashtbl.find pyobject_registry id)))
       )
-    ) in
+    )
+;;
 
-  let _ = 
+let _ = 
   python_interfaced_function 
     ~register_as:"Doudou.type"
     ~docstring:"returns the type of a registered term"
@@ -189,9 +193,10 @@ def createValue(id):
 	let _, ty = typeinfer !defs ctxt te in
 	marshal_doudou_python value_class ty
       )
-    ) in
+    )
+;;
 
-  let _ = 
+let _ = 
   python_interfaced_function 
     ~register_as:"Doudou.decref"
     ~docstring:"decrement the ref. counter of a registered term"
@@ -209,9 +214,10 @@ def createValue(id):
 	    Hashtbl.replace pyobject_registry id (value, refcounter - 1) in
 	pynone ()
       )
-    ) in
+    )
+;;
 
-  let _ =
+let _ =
     python_interfaced_function 
       ~register_as:"Doudou.proceed"
       ~docstring:"enter a definition"
@@ -250,9 +256,10 @@ def createValue(id):
 		ctxt := saved_ctxt;
 		defs := saved_defs;
 		raise (Failure (error2string err))
-      ) in
+      )
+;;
 
-  let _ = 
+let _ = 
   python_interfaced_function 
     ~register_as:"Doudou.undo"
     ~docstring:"undo last defs"
@@ -274,11 +281,9 @@ def createValue(id):
 	  (* we restore the context and defs *)
 	  raise (Failure (error2string err))
 
-    ) in
-  
-  (***************************************************)
-  
-  let _ = python_exec "import Doudou" in
-  ()
+    )
+;;  
+
+let _ = python_exec "import Doudou";;
 
 open Primitive_float;;
