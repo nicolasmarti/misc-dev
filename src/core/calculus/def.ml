@@ -59,6 +59,7 @@ object
   method virtual get_name: string
   method virtual get_type: 'a
   method virtual pprint: unit -> token
+  method virtual equal: ('a, 'b, 'c) tObj -> bool
   method virtual apply: 'c -> 'b -> ('a * nature) list -> 'a
 end
 

@@ -154,6 +154,7 @@ and unification_term_term (defs: defs) (ctxt: context ref) (te1: term) (te2: ter
 	(* the trivial cases for Type, Cste and Obj *)
 	| Type p1, Type p2 -> Type (best_pos p1 p2)
 	| Obj (o1, p1), Obj (o2, p2) when o1 = o2 -> Obj (o1, best_pos p1 p2)
+	| Obj (o1, p1), Obj (o2, p2) when o1#equal o2 -> Obj (o1, best_pos p1 p2)
 	| Cste (c1, p1), Cste (c2, p2) when c1 = c2 -> Cste (c1, best_pos p1 p2)
 
 	(* the trivial case for variable *)

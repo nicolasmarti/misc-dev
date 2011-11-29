@@ -5,6 +5,7 @@ open Libparser
 open Extlist
 open Substitution
 open Context
+open Primitive
 
 let rec withParen (t: token) : token =
   Box [Verbatim "("; t; Verbatim ")"]

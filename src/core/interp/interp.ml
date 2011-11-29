@@ -14,34 +14,34 @@ let defs = ref (empty_defs ())
 
 let ctxt = ref empty_context
 
-let registry : (int, (term * int)) Hashtbl.t = Hashtbl.create 100
+let pyobject_registry : (int, (term * int)) Hashtbl.t = Hashtbl.create 100
 
 let debug = ref false
 
-let show_registry () =
+let show_pyobject_registry () =
   (* iter : ('a -> 'b -> unit) -> ('a, 'b) t -> unit *)
   Hashtbl.iter (fun id (te, rc) ->
     let s = term2string !ctxt te in
     printf "%d: %s, %d\n" id s rc; flush Pervasives.stdout;    
-  ) registry;
+  ) pyobject_registry;
     printf "\n\n"; flush Pervasives.stdout
 
 let register (te: term) : int =  
   let id = Hashtbl.hash te in
   if !debug then printf "id for %s --> %d\n" (term2string !ctxt te) id;
-  if Hashtbl.mem registry id then (
-    if equality_term_term !defs ctxt te (fst (Hashtbl.find registry id)) then
+  if Hashtbl.mem pyobject_registry id then (
+    if equality_term_term !defs ctxt te (fst (Hashtbl.find pyobject_registry id)) then
       id 
     else (
       let id = ref (Random.int 10000000) in
-      while Hashtbl.mem registry !id do
+      while Hashtbl.mem pyobject_registry !id do
 	id := Random.int 10000000
       done;
-      let _ = Hashtbl.add registry !id (te, 1) in
+      let _ = Hashtbl.add pyobject_registry !id (te, 1) in
       !id  
     )
   ) else   
-    let _ = Hashtbl.add registry id (te, 1) in
+    let _ = Hashtbl.add pyobject_registry id (te, 1) in
     id  
 
 let marshal_doudou_python createValue te =
@@ -56,10 +56,10 @@ let marshal_python_doudou valueClass value =
   if isValue = 1 then
     let id_object = pyobject_getattr (value, pystring_fromstring "id") in
     let id = pyint_asint id_object in
-    if not (Hashtbl.mem registry id) then
+    if not (Hashtbl.mem pyobject_registry id) then
       raise (Failure "marshal_python_doudou: unknown id")
     else
-      let (te, _) = Hashtbl.find registry id in
+      let (te, _) = Hashtbl.find pyobject_registry id in
       te        
   else
     raise (Failure "marshal_python_doudou: only marshaling of Value instance for now ...")
@@ -122,14 +122,14 @@ def createValue(id):
       match args with
 	| [| id; args |] ->
 	  let id = pyint_asint id in
-	  if not (Hashtbl.mem registry id) then (
+	  if not (Hashtbl.mem pyobject_registry id) then (
 	    raise (Failure "Doudou.apply: unknown id")
 	  )
 	  else (
 	    let args = pytuple_toarray args in
 	    let args = Array.map (fun arg -> marshal_python_doudou value_class arg) args in
 	    let te = App (
-	      fst (Hashtbl.find registry id),
+	      fst (Hashtbl.find pyobject_registry id),
 	      List.map (fun hd -> (hd, Explicit)) (Array.to_list args),
 	      nopos) in
 	    let saved_ctxt = !ctxt in
@@ -166,11 +166,11 @@ def createValue(id):
     [|IntType|]
     (fun [| id |] ->
       let id = pyint_asint id in
-      if not (Hashtbl.mem registry id) then (
+      if not (Hashtbl.mem pyobject_registry id) then (
 	raise (Failure "Doudou.apply: unknown id")
       )
       else (
-	pystring_fromstring (term2string !ctxt (fst (Hashtbl.find registry id)))
+	pystring_fromstring (term2string !ctxt (fst (Hashtbl.find pyobject_registry id)))
       )
     ) in
 
@@ -181,11 +181,11 @@ def createValue(id):
     [|IntType|]
     (fun [| id |] ->
       let id = pyint_asint id in
-      if not (Hashtbl.mem registry id) then (
+      if not (Hashtbl.mem pyobject_registry id) then (
 	raise (Failure "Doudou.type: unknown id")
       )
       else (
-	let te = fst (Hashtbl.find registry id) in
+	let te = fst (Hashtbl.find pyobject_registry id) in
 	let _, ty = typeinfer !defs ctxt te in
 	marshal_doudou_python value_class ty
       )
@@ -198,15 +198,15 @@ def createValue(id):
     [|IntType|]
     (fun [| id |] ->
       let id = pyint_asint id in
-      if not (Hashtbl.mem registry id) then (
+      if not (Hashtbl.mem pyobject_registry id) then (
 	raise (Failure "Doudou.decref: unknown id")
       )
       else (
-	let (value, refcounter) = Hashtbl.find registry id in
+	let (value, refcounter) = Hashtbl.find pyobject_registry id in
 	let _ = if refcounter = 1 then
-	    Hashtbl.remove registry id		    
+	    Hashtbl.remove pyobject_registry id		    
 	  else
-	    Hashtbl.replace registry id (value, refcounter - 1) in
+	    Hashtbl.replace pyobject_registry id (value, refcounter - 1) in
 	pynone ()
       )
     ) in
@@ -280,3 +280,5 @@ def createValue(id):
   
   let _ = python_exec "import Doudou" in
   ()
+
+open Primitive_float;;

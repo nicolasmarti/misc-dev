@@ -2,6 +2,7 @@ open Def
 open Extlist
 open Misc
 open Libparser
+open Primitive
 
 (**********************************)
 (* parser (lib/parser.ml version) *)
