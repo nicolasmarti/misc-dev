@@ -90,11 +90,8 @@ let ptrvalue_align : int = abi_align target_data ptrvalue_ty;;
 
 printf "ptrvalue: ty := %s; size := %d; align := %d\n" (string_of_lltype ptrvalue_ty) ptrvalue_ty_size ptrvalue_align;;
 
-(* the minimum alignment in bits between ptr and value *)
-let min_align_bits = min value_align ptrvalue_align;;
-
-(* from which we can compute the number of less-significant bits irrelevant in a ptr *)
-let free_bits : int = int_of_float (log (float min_align_bits) /. log 2.);;
+(* we can compute the number of less-significant bits irrelevant in a ptr *)
+let free_bits : int = int_of_float (log (float ptrvalue_align) /. log 2.);;
 
 printf "free_bits := %d\n" free_bits;;
 
