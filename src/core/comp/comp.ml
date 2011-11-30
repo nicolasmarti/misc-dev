@@ -95,13 +95,15 @@ let free_bits : int = int_of_float (log (float (min value_align ptrvalue_align))
 
 printf "free_bits := %d\n" free_bits;;
 
+flush stdout;;
+
 (* make sure we have at least 2 bits *)
 assert (free_bits >= 2);;
 
 (* this number of bits will be use to mark two things
    bit 0 -> if 1 we are sure that the value encode a cste value (rather than a pointer to a applied value)
-   bit 1 -> if == 1 then the value is an axiom | constructor id 
-         -> if == 0 then the value is a (llvm) function pointer
+   bit 1 -> if == 1 then the value is an axiom | constructor | Inductive id  
+         -> if == 0 then the value is a function (a (llvm) function pointer)
  *)
 
 (* the empty value and error value*)
