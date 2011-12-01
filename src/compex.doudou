@@ -1,0 +1,69 @@
+nat :: Type :=
+| O :: nat
+| S :: nat -> nat
+
+list (A :: Type) :: Type :=
+| [[]] :: list A
+| (:) : right, 30 :: A -> list A -> list A
+
+(+) : right, 40 :: nat -> nat -> nat
+O + y := y
+x + O := x
+S x + y := S (x + y)
+
+(*) : right, 50 :: nat -> nat -> nat
+O * _ := O
+_ * O := O
+S x * y := y + (x * y)
+
+mult :: nat -> nat -> nat
+mult x y := x * y
+
+mult2 :: nat -> nat -> nat
+mult2 := (*)
+
+div2 :: nat -> nat
+div2 O := O
+div2 (S O) := O
+div2 (S (S x)) := S (div2 x)
+
+bool :: Type :=
+| true :: bool
+| false :: bool
+
+(&&) : right, 20 :: bool -> bool -> bool
+true && true := true
+false && _ := false
+_ && false := false
+
+(==) : no, 35 :: {A :: Type} -> A -> A -> bool
+
+(==) O O := true
+(==) (S _) O := false
+(==) O (S _) := false
+(==) (S x) (S y) := x == y
+
+(==) [] [] := true
+(==) (_:_) [] := false
+(==) [] (_:_) := false
+(==) {list A} (hd1:tl1) (hd2:tl2) := hd1 == hd2 && tl1 == tl2
+
+foldl :: {A B:: Type} -> (B -> A -> B) -> B -> list A -> B
+foldl f acc [] := acc
+foldl f acc (hd:tl) := foldl f (f acc hd) tl
+
+sum :: list nat -> nat
+sum l := foldl (+) O l
+
+serie :: nat -> list nat
+serie O := O : []
+serie (S x) := S x : serie x
+
+sumseries :: nat -> nat
+sumseries := \ x -> sum (serie x)
+
+sumseries2 :: nat -> nat
+sumseries2 x := div2 (x * (S x))
+
+verify :: nat -> bool
+verify x := sumseries x == sumseries2 x
