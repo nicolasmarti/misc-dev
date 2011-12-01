@@ -110,7 +110,35 @@ assert (free_bits >= 2);;
 let empty_value : llvalue = const_all_ones value_ty;;
 let error_value : llvalue = const_null value_ty;;
 
-(* a simple test *)
+(* the semantics of value is the following
+   (this semantics is only valid for "pure" terms (no Obj term that has a special compilation)
+   * value:
+   - if all the bit of the value are set: error value
+   - if all the bit of the value are unset: this is an empty value
+   - if the lesser bits of the value are 0x01: the upper bits are an (axiom | constructor | inductive | Type) id
+   - if the lesser bits of the value are 0x11: the value with the lesser bits sets to 0x00 is a pointer of an llvm function
+   - if the lesser bits of the value are 0x00: the value is a pointer to an application value (allocated in the GC)
+   - if the lesser bits of the value are 0x10: ??????
+
+   * application value:
+   - a value corresponding to the head
+   - a value, which semantics is a bitmap representing the arity + partially applied args
+     0...01...10...0
+     |-1-||-2-||-3-|
+     1 -> partially applied args
+     2 -> remaining args
+     3 -> padded
+     when all bits of bitmap are set to zero -> can be reduced (if head is a pointer to a llvm function -> give it the pointer to the args, replace the pointer to the application value, by the function returned value)
+   - values of partially applied arguments
+
+   It should works because we are eager
+
+ *)
+
+(* 
+
+
+*)
 
 (* *)
 
