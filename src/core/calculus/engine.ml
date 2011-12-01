@@ -560,11 +560,15 @@ and reduction (defs: defs) (ctxt: context ref) (strat: reduction_strategy) (te: 
 	      (* we could check that n = argn, but it should have been already checked *)
 	      (* can we unify the pattern ? *)
 		try 
-		  (* we need to cut arguments *)
-		  let PApp (_, pargs, _, _) = p in
-		  let neededargs = take (List.length pargs) args in
-		  let surplusargs = drop (List.length pargs) args in
-		  let r = unification_pattern_term !ctxt p (App (Cste (c1, pos), neededargs, nopos)) in
+		  let pargs_length = begin 
+		    match p with 
+		      | PApp (_, pargs, _, _) -> List.length pargs
+		      | _ -> 0
+		  end in
+		  let neededargs = take pargs_length args in
+		  let surplusargs = drop pargs_length args in
+		  let cutterm = if pargs_length = 0 then Cste (c1, pos) else (App (Cste (c1, pos), neededargs, nopos)) in
+		  let r = unification_pattern_term !ctxt p cutterm in
 		  let te = term_substitution r body in
 		  match surplusargs with
 		    | [] -> Right te
