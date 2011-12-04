@@ -11,3 +11,14 @@ extern double printd(double X) {
   printf("%f\n", X);
   return 0;
 }
+
+/* printi - printf that takes an int prints it as "%f\n", returning 0. */
+extern void printi(int X) {
+  printf("%d\n", X);
+  return;
+}
+
+extern void printp(int* X) {
+  printf("%p\n", X);
+  return;
+}
