@@ -9,6 +9,8 @@ open Printf;;
 
 ignore (initialize_native_target ());;
 
+let optimize = ref false;;
+
 let context = global_context ();;
 
 let modul = create_module context "mymms";;
@@ -33,12 +35,10 @@ add_scalar_repl_aggregation pass_manager;
 add_ind_var_simplification pass_manager;    
 add_instruction_combination pass_manager;
 add_licm pass_manager;
-(*add_loop_unswitch pass_manager;*)
 add_loop_unroll pass_manager;
 add_loop_rotation pass_manager;
-(*add_loop_index_split pass_manager;*)
 add_memory_to_register_promotion pass_manager;
-add_memory_to_register_demotion pass_manager;
+(*add_memory_to_register_demotion pass_manager;*)
 add_reassociation pass_manager;
 add_jump_threading pass_manager;
 add_cfg_simplification pass_manager;
@@ -188,15 +188,23 @@ let memset_ptr : llvalue = declare_function "memset" memset_type modul;;
 
 (******************* GC related Code **********************)
 
-
+(* the type of the counter of allocated bulk in the segment *)
 let segment_count_type (nbbulk: int) : lltype = integer_type context (log_i nbbulk 2);;
 
-let segment_bulk_type (nbbulk: int) (value_per_bulk: int) : lltype = array_type (array_type value_ty value_per_bulk) nbbulk;;
+(* the type of a bulk *)
+let bulk_type (bulksize: int) : lltype = array_type value_ty bulksize;;
 
+(* the type of the array of bulk *)
+let segment_bulk_type (nbbulk: int) (bulksize: int) : lltype = array_type (bulk_type bulksize) nbbulk;;
+
+(* a gc parameter: the number of bit per bitmap word *)
 let bitmap_unit_size : int = 32;;
+(* the type of bitmap word *)
 let bitmap_unit_type : lltype = integer_type context bitmap_unit_size;;
+(* the depth of the bitmap *)
 let bitmap_depth (nbbulk: int) : int = log_i nbbulk bitmap_unit_size;;
 
+(* the number of bitmap words per level *)
 let bitmap_unit_level_size (nbbulk: int) (level: int) : int = 
   let nb_level = bitmap_depth nbbulk in
   if level >= nb_level then raise (Failure "level overflow");
@@ -209,7 +217,26 @@ let bitmap_unit_level_size (nbbulk: int) (level: int) : int =
   done;
   !res
 ;;
-  
+
+(* the last valid bitptr valid mask *)
+let bimap_level_last_mask (nbbulk: int) (level: int) : int =
+  let nb_level = bitmap_depth nbbulk in
+  if level >= nb_level then raise (Failure "level overflow");
+  if level < 0 then raise (Failure "level overflow");
+  let nbelt = if level = 0 then nbbulk else bitmap_unit_level_size nbbulk (level - 1) in
+  let divs = div_i nbelt bitmap_unit_size in
+  let rest = divs * bitmap_unit_size - nbelt in
+  bitmap_unit_size - rest - 1
+;;
+
+(* a bitptr is a pair of an index and a mask *)
+let index_ty : lltype = bitmap_unit_type;;
+let mask_ty : lltype = bitmap_unit_type;;
+
+let max_mask_value : llvalue = const_shl (const_int bitmap_unit_type 1) (const_int (bitmap_unit_type) (bitmap_unit_size - 1));;
+let min_mask_value : llvalue = const_int (bitmap_unit_type) 1;;
+
+(* the type of the bitmap*)
 let bitmap_levels_size (nbbulk: int) : int array =
   let nb_level = bitmap_depth nbbulk in
   Array.init nb_level (fun i ->
@@ -219,78 +246,253 @@ let bitmap_levels_size (nbbulk: int) : int array =
   )
 ;;
 
+(* the type of the bitmap of a segment *)
 let bitmap_type (nbbulk: int) : lltype =
   let a = bitmap_levels_size nbbulk in
   let a = Array.map (fun i -> array_type bitmap_unit_type i) a in
   struct_type context a
 ;;
 
-
-let segment_type (nbbulk: int) (value_per_bulk: int) : lltype =
-  let ty = struct_type context [| segment_count_type nbbulk; segment_bulk_type nbbulk value_per_bulk; bitmap_type nbbulk|] in
+(* a segment type *)
+let segment_type (nbbulk: int) (bulksize: int) : lltype =
+  let ty = struct_type context [| segment_count_type nbbulk; segment_bulk_type nbbulk bulksize; bitmap_type nbbulk|] in
   (*printf "segment_type := %s\n" (string_of_lltype ty); flush stdout;*)
   ty
 ;;
 
-let nb_lebel_to_nbbulk (level: int) = 
-  power_i bitmap_unit_size level 
+(* the type of the byteptr for a segment *)
+let bitptr (nbbulk: int) : lltype = 
+  array_type (struct_type context [| index_ty; mask_ty |]) (bitmap_depth nbbulk);;
+
+(* the type of a bulk pointer *)
+let bulkptr (bulksize: int) : lltype = pointer_type (bulk_type bulksize);; 
+
+(* the type of an allocation pointer *)
+let allocptr (nbbulk: int) (bulksize: int) : lltype = struct_type context [| segment_type nbbulk bulksize; bitptr nbbulk; bulkptr bulksize |];;
+
+(* the size in bytes of a segments *)
+let segment_size_bytes (nbbulk: int) (value_per_bulk: int) : int =
+    let segment_ex_type = segment_type nbbulk value_per_bulk in
+    Int64.to_int (abi_size target_data segment_ex_type)
+;;
+
+(* the max segment size: a power of two used for alignment *)
+let max_segment_size : int = power_i 2 10
+;;
+
+(* given the max_segment_size, compute the number of bulk given their size *)
+let nbbulk_from_bulksize (bulksize: int) : int =
+  let sz = ref 1 in
+  let loop = ref true in
+  while !loop do
+    if segment_size_bytes (!sz + 1) bulksize > max_segment_size then loop := false else sz := !sz + 1
+  done;
+  !sz
+;;
+
+(* we are going to build dynamically static functions in llvm *)
+
+(* the global maxbitptr *)
+
+let max_bitptr (bulksize: int) (level: int) : llvalue =
+  let nbbulk = nbbulk_from_bulksize bulksize in
+  let var_name = String.concat "_" ["max_bitptr"; string_of_int bulksize; string_of_int level] in
+  match lookup_global var_name modul with
+    | Some v -> v
+    | None ->
+      let max_index = bitmap_unit_level_size nbbulk level in
+      let max_mask = power_i 2 (bimap_level_last_mask nbbulk level) in
+      let init = const_struct context [| const_int index_ty max_index; const_int mask_ty max_mask |] in
+      define_global var_name init modul
 ;;
 
 
-let segment_alignment : llvalue =
-  let nbbulk = nb_lebel_to_nbbulk 2 in
-  printf "nbbulk = %d\n" nbbulk; flush stdout;
-  let sum = ref 0 in
-  let maxsz = ref 0 in
-  let _ = Array.init (value_ty_size - 3) (fun i -> 
-    let segment_ex_type = segment_type nbbulk (i+3) in
-    let sz = Int64.to_int (size_in_bits target_data segment_ex_type) in
-    let stsz = Int64.to_int (store_size target_data segment_ex_type) in
-    let abisz = Int64.to_int (abi_size target_data segment_ex_type) in
-    let abize_ko = div_i abisz 1024 in
-    let segment_type_str = string_of_lltype segment_ex_type in
-    printf "%d value bulks; type := %s; size := %d k.o.\n" (i + 3) segment_type_str abize_ko; flush stdout;
-    sum := !sum + abize_ko;
-    if !maxsz < abize_ko then maxsz := abize_ko
-  ) in
-  printf "total size <= %d k.o.\n" !sum; flush stdout;
-  printf "max size := %d \n" !maxsz; flush stdout;
-  let log2 = log_i (!maxsz * 1024) 2 in
-  printf "alignment := %d k.o (2^%d) [padding = %d k.o.]\n" (div_i (power_i 2 log2) 1024) log2 (div_i ((power_i 2 log2) - (!maxsz * 1024)) 1024); flush stdout;
-  printf "number of allocable segment := %d\n" (power_i 2 (32 - log2)); flush stdout;
-  const_int size_type (power_i 2 log2)  
+let one = const_int (integer_type context 32) 1;;
+let zero = const_int (integer_type context 32) 0;;
+
+(* incBitPtr
+ *)
+let rec incBitPtr (bulksize: int) (level: int) : llvalue =
+  let nbbulk = nbbulk_from_bulksize bulksize in
+  let fct_name = String.concat "_" ["incBitPtr"; string_of_int bulksize; string_of_int level] in
+  match lookup_function fct_name modul with
+    | Some fct -> fct
+    | None ->
+      let fct_ty = function_type void_type [|pointer_type (struct_type context [| index_ty; mask_ty |]) |] in
+      let fct = declare_function fct_name fct_ty modul in
+      let _ = set_value_name "bitptr" (params fct).(0) in
+      let bitptr = (params fct).(0) in
+      let max_bitptr = max_bitptr bulksize level in
+      let entryb = append_block context "entry" fct in
+      let builder = builder context in
+      position_at_end entryb builder;
+
+      let block1 = append_block context "indexeq_testmask" fct in
+      let block2 = append_block context "indexeq_maskeq" fct in
+
+      let block3 = append_block context "indexneq_testmask" fct in
+      let block4 = append_block context "indexneq_maskeq" fct in
+      let block5 = append_block context "indexneq_maskneq" fct in
+
+      (* we first test that the bitptr is not maximal *)
+      let indexptr = build_gep bitptr [| zero; zero |] "indexptr" builder in
+      let index = build_load indexptr "index" builder in
+
+      let maskptr = build_gep bitptr [| zero; one |] "maskptr" builder in
+      let mask = build_load maskptr "mask" builder in
+
+      let max_indexptr = build_gep max_bitptr [| zero; zero |] "max_indexptr" builder in
+      let max_index = build_load max_indexptr "max_index" builder in
+
+      let cmp = build_icmp Icmp.Eq index max_index "cmp" builder in 
+      let _ = build_cond_br cmp block1 block3 builder in
+
+      position_at_end block1 builder;
+      
+      let max_maskptr = build_gep max_bitptr [| zero; one |] "max_maskptr" builder in
+      let max_mask = build_load max_maskptr "max_mask" builder in
+
+      let cmp = build_icmp Icmp.Eq mask max_mask "cmp" builder in 
+      let _ = build_cond_br cmp block2 block3 builder in
+
+      position_at_end block2 builder;
+
+      let _ = build_ret_void builder in
+
+      position_at_end block3 builder;
+
+      let cmp = build_icmp Icmp.Eq mask max_mask_value "cmp" builder in 
+      let _ = build_cond_br cmp block4 block5 builder in
+      
+      position_at_end block4 builder;
+      
+      let new_index = build_add index (const_int (type_of index) 1) "add" builder in
+      let _ = build_store new_index indexptr builder in
+      let _ = build_store min_mask_value maskptr builder in
+      let _ = build_ret_void builder in
+
+      position_at_end block5 builder;
+
+      let new_mask = build_shl mask (const_int (type_of index) 1) "shl" builder in
+      let _ = build_store new_mask maskptr builder in
+      let _ = build_ret_void builder in
+      Llvm_analysis.assert_valid_function fct;
+      if !optimize then ignore(PassManager.run_function fct pass_manager);
+      fct
 ;;
 
-(* build gc init function *)
+(* indexToBitPtr
+ *)
+let indexToBitPtr () : llvalue =
+  let fct_name = String.concat "_" ["indexToBitPtr"] in
+  match lookup_function fct_name modul with
+    | Some fct -> fct
+    | None ->
+      let fct_ty = function_type void_type [| pointer_type (struct_type context [| index_ty; mask_ty |]); index_ty |] in
+      let fct = declare_function fct_name fct_ty modul in
+      let _ = set_value_name "bitptr" (params fct).(0) in
+      let bitptr = (params fct).(0) in
+      let _ = set_value_name "index" (params fct).(1) in
+      let index = (params fct).(1) in
+      let entryb = append_block context "entry" fct in
+      let builder = builder context in
+      position_at_end entryb builder;
 
-let gc_init_type = function_type void_type [| void_type |];;
+      let idx = build_udiv index (const_int (type_of index) bitmap_unit_size) "idx" builder in
+      let rem = build_urem index (const_int (type_of index) bitmap_unit_size) "idx" builder in
+      let mask = build_shl (const_int mask_ty 1) rem "mask" builder in
 
-let gc_init_fct = declare_function "gc_init" gc_init_type modul;;
+      let indexptr = build_gep bitptr [| zero; zero |] "indexptr" builder in
+      let _ = build_store idx indexptr builder in
 
+      let maskptr = build_gep bitptr [| zero; one |] "maskptr" builder in
+      let _ = build_store mask maskptr builder in
+
+      let _ = build_ret_void builder in
+      Llvm_analysis.assert_valid_function fct;
+      if !optimize then ignore(PassManager.run_function fct pass_manager);
+      fct
+;;
+
+(*
+  log2
+*)
+
+let log2 () : llvalue =
+  let fct_name = String.concat "_" ["log2"] in
+  match lookup_function fct_name modul with
+    | Some fct -> fct
+    | None ->
+      let fct_ty = function_type index_ty [| mask_ty |] in
+      let fct = declare_function fct_name fct_ty modul in
+      let _ = set_value_name "n" (params fct).(0) in
+      let n = (params fct).(0) in
+      let entryb = append_block context "entry" fct in
+      let exitb = append_block context "exit" fct in
+      let builder = builder context in
+      position_at_end entryb builder;
+
+      let resptr = build_alloca index_ty "resptr" builder in
+      let _ = build_store (const_int index_ty 0) resptr builder in
+
+      let nptr = build_alloca index_ty "nptr" builder in
+      let _ = build_store n nptr builder in
+
+      let sz = Int64.to_int (size_in_bits target_data mask_ty) in
+      let log_ty = log_i sz 2 in
+      assert (power_i 2 log_ty = sz);
+      let blocks = Array.init log_ty (fun i ->
+	append_block context "casetrue" fct, append_block context "next" fct
+      ) in
+      let _ = build_br (snd blocks.(0)) builder in      
+      let _ = Array.init log_ty (fun i ->
+	position_at_end (snd blocks.(i)) builder;
+	let pow = power_i 2 (log_ty - i - 1) in
+	let cst = const_shl (const_int mask_ty 1) (const_int mask_ty pow) in
+	(*printf "case (1 << %d)\n" (power_i 2 (log_ty - i - 1));*)
+
+	let n = build_load nptr "n" builder in
+
+	let cmp = build_icmp Icmp.Ule n cst "cmp" builder in
+	let _ = build_cond_br cmp (fst (blocks.(i))) (if i = log_ty -1 then exitb else snd (blocks.(i+1))) builder in
+	position_at_end (fst blocks.(i)) builder;
+
+	let res = build_load resptr "res" builder in
+	let res = build_add res (const_int index_ty pow) "res" builder in
+	let _ = build_store res resptr builder in
+
+	let n = build_load nptr "n" builder in
+	let n = build_lshr n (const_int index_ty pow) "n" builder in
+	let _ = build_store n nptr builder in
+
+	let _ = build_br (if i = log_ty -1 then exitb else snd (blocks.(i+1))) builder in
+	()
+      ) in
+      position_at_end exitb builder;
+      let res = build_load resptr "res" builder in
+      let _ = build_ret res builder in
+      Llvm_analysis.assert_valid_function fct;
+      if !optimize then ignore(PassManager.run_function fct pass_manager);
+      fct
+;;
+
+(* just an example *)
 let _ = 
-  let entryb = append_block context "entry" gc_init_fct in
-  let builder = builder context in
-  let _ = position_at_end entryb builder in
-
-  let nbbulk = nb_lebel_to_nbbulk 2 in
-  
-  let _ = Array.init (value_ty_size - 3) (fun i -> 
-    let segment_ex_type = segment_type nbbulk (i+3) in
-    let segment_null = const_null segment_ex_type in
-    let segment_size = Int64.to_int (store_size target_data segment_ex_type) in
-    let segmentptr = build_call memalign_ptr [| segment_alignment; const_int size_type segment_size |] "segmentptr" builder in
-    let _ = build_call memset_ptr [| segmentptr; const_int size_type 0; const_int size_type segment_size |] "memset" builder in
-    let _ = build_call printi_ptr [| const_int size_type (i+3) |] "debug" builder in
-    let _ = build_call printp_ptr [| segmentptr |] "debug" builder in
+  Array.init (value_ty_size + 2 - 1) (fun i ->
+    let bulksize = i + 2 in
+    let nbbulk = nbbulk_from_bulksize bulksize in
+    printf "bulksize := %d --> nbbulk := %d, ty := %s\n" bulksize nbbulk (string_of_lltype (segment_type nbbulk bulksize)); flush stdout;
+    let _ = Array.init (bitmap_depth nbbulk) (fun i ->
+      printf "\tlevel := %d, max mask := %d\n" i (bimap_level_last_mask nbbulk i); flush stdout;
+      let _ = incBitPtr bulksize i in
+      ()
+    ) in
     ()
-  ) in
-  build_ret_void builder
+  );
+  let _ = indexToBitPtr () in
+  let _ = log2 () in
+  dump_module modul
 ;;
-
-dump_module modul
-;;
-
-ignore(ExecutionEngine.run_function gc_init_fct [||] engine);;
 
 (******************* mymms Compiler **********************)
 
