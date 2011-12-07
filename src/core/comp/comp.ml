@@ -848,6 +848,73 @@ let rec findNextFreeBlock (bulksize: int) (level: int) : llvalue =
       fct
 ;;
 
+let rec setBit (bulksize: int) (level: int) : llvalue =
+  let nbbulk = nbbulk_from_bulksize bulksize in
+  let fct_name = String.concat "_" ["setBit"; string_of_int bulksize; string_of_int level] in
+  match lookup_function fct_name modul with
+    | Some fct -> fct
+    | None ->
+      let fct_ty = function_type void_type [| pointer_type (allocptr_type nbbulk bulksize) |] in
+      let fct = declare_function fct_name fct_ty modul in
+
+      let _ = set_value_name "allocptr" (params fct).(0) in
+      let allocptr = (params fct).(0) in
+
+      let entryb = append_block context "entry" fct in
+      let builder = builder context in
+      position_at_end entryb builder;
+
+      let segmentptr = build_gep allocptr [| zero; zero |] "segmentptr" builder in
+      let bitjptr = build_gep allocptr [| zero; one; const_int (type_of zero) level |] "bitptrj" builder in
+
+      let bmjptr = build_gep segmentptr [| zero; two; const_int (type_of zero) level |] "bmjptr" builder in
+      
+      let idxjptr = build_gep bitjptr [| zero; zero |] "idxjptr" builder in
+      let idxj = build_load idxjptr "idxj" builder in
+
+      let maskjptr = build_gep bitjptr [| zero; one |] "maskjptr" builder in
+      let maskj = build_load maskjptr "maskj" builder in
+      
+      let bmjidxjptr = build_gep bmjptr [| const_int (type_of idxj) 0; idxj |] "bmjidxjptr" builder in
+      let bmjidxj = build_load bmjidxjptr "bmjidxj" builder in
+
+      let newbmjidxj = build_or bmjidxj maskj "newbmjidxj" builder in
+
+      let _ = build_store newbmjidxj bmjidxjptr builder in 
+
+      if level + 1 >= bitmap_depth nbbulk then 
+	let _ = build_ret_void builder in () 
+      else (
+
+	let full = const_all_ones (type_of newbmjidxj) in
+	let cmp = build_icmp Icmp.Eq full newbmjidxj "cmp" builder in
+
+	let block1 = append_block context "isfull" fct in
+	let block2 = append_block context "isnotfull" fct in
+
+	let _ = build_cond_br cmp block1 block2 builder in
+	
+	position_at_end block2 builder;
+	let _ = build_ret_void builder in
+
+	position_at_end block1 builder;
+
+	let bitptrjp1ptr = build_gep allocptr [| zero; one; const_int (type_of zero) (level + 1) |] "bitptrjp1ptr" builder in
+	
+	let _ = build_call (indexToBitPtr ()) [| bitptrjp1ptr; idxj |] "" builder in
+	
+	let _ = build_call (setBit bulksize (level + 1)) [| allocptr |] "" builder in
+
+	let _ = build_ret_void builder in
+	()
+      );
+
+      
+
+      Llvm_analysis.assert_valid_function fct;
+      if !optimize then ignore(PassManager.run_function fct pass_manager);
+      fct
+;;
 
 (* just an example *)
 let _ = 
@@ -862,6 +929,7 @@ let _ =
       let _ = nextMask bulksize i in
       let _ = forwardBitPtr bulksize i in
       let _ = findNextFreeBlock bulksize i in
+      let _ = setBit bulksize i in 
       ()
     ) in
     let _ = blockAddress bulksize in
