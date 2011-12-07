@@ -281,7 +281,7 @@ let segment_size_bytes (nbbulk: int) (value_per_bulk: int) : int =
 ;;
 
 (* the max segment size: a power of two used for alignment *)
-let max_segment_size : int = power_i 2 14
+let max_segment_size : int = power_i 2 12
 ;;
 
 (* given the max_segment_size, compute the number of bulk given their size *)
@@ -680,7 +680,7 @@ let rec nextMask (bulksize: int) (level: int) : llvalue =
   match lookup_function fct_name modul with
     | Some fct -> fct
     | None ->
-      let fct_ty = function_type bool_type [| pointer_type (struct_type context [| index_ty; mask_ty |]); pointer_type (segment_type nbbulk bulksize) |] in
+      let fct_ty = function_type bool_type [| pointer_type (struct_type context [| index_ty; mask_ty |]); pointer_type (segment_type nbbulk bulksize); bool_type |] in
       let fct = declare_function fct_name fct_ty modul in
 
       let _ = set_value_name "bitptr" (params fct).(0) in
@@ -688,6 +688,9 @@ let rec nextMask (bulksize: int) (level: int) : llvalue =
 
       let _ = set_value_name "segmentptr" (params fct).(1) in
       let segmentptr = (params fct).(1) in
+
+      let _ = set_value_name "initinc" (params fct).(2) in
+      let initinc = (params fct).(2) in
 
       let entryb = append_block context "entry" fct in
       let builder = builder context in
@@ -701,7 +704,7 @@ let rec nextMask (bulksize: int) (level: int) : llvalue =
 
       let block4 = append_block context "success" fct in      
 
-      let _ = build_br block1 builder in
+      let _ = build_cond_br initinc block1 block3 builder in
       
       position_at_end block1 builder;
 
@@ -738,7 +741,7 @@ let rec forwardBitPtr (bulksize: int) (level: int) : llvalue =
       let fct = declare_function fct_name fct_ty modul in
 
       let _ = set_value_name "allocptr" (params fct).(0) in
-      let bitptr = (params fct).(0) in
+      let allocptr = (params fct).(0) in
 
       let entryb = append_block context "entry" fct in
       let builder = builder context in
@@ -750,13 +753,100 @@ let rec forwardBitPtr (bulksize: int) (level: int) : llvalue =
       )
       else
 	(
+	  let segmentptr = build_gep allocptr [| zero; zero |] "segmentptr" builder in
+	  let bitptrj = build_gep allocptr [| zero; one; const_int (type_of zero) level |] "bitptrj" builder in
+	  let bitptrjp1 = build_gep allocptr [| zero; one; const_int (type_of zero) (level + 1) |] "bitptrjp1" builder in
+
+	  let idxj = build_gep bitptrj [| zero; zero |] "idxj" builder in
+	  let idx = build_load idxj "idx" builder in
+	  let _ = build_call (indexToBitPtr ()) [| bitptrjp1; idx |] "" builder in
+	  
+	  let maskjp1 = build_gep bitptrjp1 [| zero; one |] "maskjp1" builder in
+	  let nm = build_call (nextMask bulksize (level + 1)) [| bitptrjp1; segmentptr; true_ |] "nm" builder in
+	  
+	  let block1 = append_block context "nm_fail" fct in
+	  let block2 = append_block context "rec_fail" fct in
+	  let block3 = append_block context "nm_or_rec_success" fct in
+
+	  let _ = build_cond_br nm block3 block1 builder in
+
+	  position_at_end block1 builder;
+	  
+	  let rec_ = build_call (forwardBitPtr bulksize (level + 1)) [| allocptr |] "rec_" builder in
+	  
+	  let _ = build_cond_br rec_ block3 block2 builder in
+
+	  position_at_end block2 builder;
+
+	  let _ = build_ret false_ builder in
+  
+	  position_at_end block3 builder;
+
+	  let idx = build_call (bitptrToIndex ()) [| bitptrjp1 |] "idx" builder in
+	  let _ = build_store idx idxj builder in
+
+	  let maskj = build_gep bitptrj [| zero; one |] "maskj" builder in	  
+	  let _ = build_store (const_int mask_ty 1) maskj builder in
+
+	  let _ = build_call (nextMask bulksize level) [| bitptrj; segmentptr; false_ |] "" builder in
+	  
 	  let _ = build_ret true_ builder in
 	  ()
 	);
       Llvm_analysis.assert_valid_function fct;
       if !optimize then ignore(PassManager.run_function fct pass_manager);
       fct
+;;
 
+let rec findNextFreeBlock (bulksize: int) (level: int) : llvalue =
+  let nbbulk = nbbulk_from_bulksize bulksize in
+  let fct_name = String.concat "_" ["findNextFreeBlock"; string_of_int bulksize; string_of_int level] in
+  match lookup_function fct_name modul with
+    | Some fct -> fct
+    | None ->
+      let fct_ty = function_type bool_type [| pointer_type (allocptr_type nbbulk bulksize) |] in
+      let fct = declare_function fct_name fct_ty modul in
+
+      let _ = set_value_name "allocptr" (params fct).(0) in
+      let allocptr = (params fct).(0) in
+
+      let entryb = append_block context "entry" fct in
+      let builder = builder context in
+      position_at_end entryb builder;
+      
+      let segmentptr = build_gep allocptr [| zero; zero |] "segmentptr" builder in
+      let bitptr0 = build_gep allocptr [| zero; one; const_int (type_of zero) 0 |] "bitptr0" builder in
+
+      let found = build_call (nextMask bulksize 0) [| bitptr0; segmentptr; true_ |] "found" builder in
+      
+      let block1 = append_block context "nextMaskfailed" fct in
+
+      let block2 = append_block context "forwardBitPtrfailed" fct in
+
+      let block3 = append_block context "success" fct in
+
+      let _ = build_cond_br found block3 block1 builder in
+
+      position_at_end block1 builder;
+
+      let found = build_call (forwardBitPtr bulksize 0) [| allocptr |] "found" builder in
+      
+      let _ = build_cond_br found block3 block2 builder in
+
+      position_at_end block2 builder;
+
+      let _ = build_ret false_ builder in
+
+      position_at_end block3 builder;
+
+      let bulkptr = build_call (blockAddress bulksize) [| bitptr0; segmentptr |] "bulkptr" builder in
+
+      let _ = build_ret true_ builder in
+
+      Llvm_analysis.assert_valid_function fct;
+      if !optimize then ignore(PassManager.run_function fct pass_manager);
+      fct
+;;
 
 
 (* just an example *)
@@ -770,8 +860,8 @@ let _ =
       let _ = incBitPtr bulksize i in
       let _ = isMarked bulksize i in
       let _ = nextMask bulksize i in
-      let _ = nextMask bulksize i in
       let _ = forwardBitPtr bulksize i in
+      let _ = findNextFreeBlock bulksize i in
       ()
     ) in
     let _ = blockAddress bulksize in
