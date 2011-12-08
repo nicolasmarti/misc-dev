@@ -22,3 +22,8 @@ extern void printp(int* X) {
   printf("%p\n", X);
   return;
 }
+
+extern void prints(char* X) {
+  printf("%s", X);
+  return;
+}

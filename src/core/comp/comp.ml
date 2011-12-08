@@ -5,6 +5,8 @@ open Llvm_scalar_opts;;
 
 open Printf;;
 
+let debug = ref false;;
+
 (********************* general LLVM setup ********************)
 
 ignore (initialize_native_target ());;
@@ -189,6 +191,20 @@ let printp_ptr : llvalue = declare_function "printp" printp_type modul;;
 let memset_type : lltype = function_type ptri8_type [| ptri8_type; size_type; size_type |];;
 let memset_ptr : llvalue = declare_function "memset" memset_type modul;;
 
+let prints_type : lltype = function_type void_type [| ptri8_type |];;
+let prints_ptr : llvalue = declare_function "prints" prints_type modul;;
+
+
+let llvm_printf str builder =
+  let str = const_stringz context str in
+  let alloca = build_alloca (type_of str) "alloca" builder in
+  let _ = build_store str alloca builder in
+  let alloca = build_bitcast alloca ptri8_type "alloca" builder in
+  let _ = build_call prints_ptr [| alloca |] "" builder in
+  ()
+;;
+
+
 
 (******************* GC related Code **********************)
 
@@ -304,7 +320,7 @@ let max_bitptr (bulksize: int) (level: int) : llvalue =
   match lookup_global var_name modul with
     | Some v -> v
     | None ->
-      let max_index = bitmap_unit_level_size nbbulk level in
+      let max_index = bitmap_unit_level_size nbbulk level - 1 in
       let max_mask = power_i 2 (bimap_level_last_mask nbbulk level) in
       let init = const_struct context [| const_int index_ty max_index; const_int mask_ty max_mask |] in
       define_global var_name init modul
@@ -407,7 +423,7 @@ let indexToBitPtr () : llvalue =
       position_at_end entryb builder;
 
       let idx = build_udiv index (const_int (type_of index) bitmap_unit_size) "idx" builder in
-      let rem = build_urem index (const_int (type_of index) bitmap_unit_size) "idx" builder in
+      let rem = build_urem index (const_int (type_of index) bitmap_unit_size) "rem" builder in
       let mask = build_shl (const_int mask_ty 1) rem "mask" builder in
 
       let indexptr = build_gep bitptr [| zero; zero |] "indexptr" builder in
@@ -555,6 +571,8 @@ let rec isMarked (bulksize: int) (level: int) : llvalue =
       let byteptr = build_gep bmptr [| const_int (type_of index) 0; index |] "byte" builder in
       let byte = build_load byteptr "byte" builder in
 
+      let byte = build_and mask byte "byte" builder in
+
       let cmp = build_icmp Icmp.Eq mask byte "cmp" builder in
       
       let _ = build_ret cmp builder in
@@ -606,7 +624,7 @@ let rec blockAddress (bulksize: int) : llvalue =
  *)
 let rec incMaskBit (bulksize: int) (level: int) : llvalue =
   let nbbulk = nbbulk_from_bulksize bulksize in
-  let fct_name = String.concat "_" ["incBitPtr"; string_of_int bulksize; string_of_int level] in
+  let fct_name = String.concat "_" ["incMaskBit"; string_of_int bulksize; string_of_int level] in
   match lookup_function fct_name modul with
     | Some fct -> fct
     | None ->
@@ -885,7 +903,7 @@ let rec setBit (bulksize: int) (level: int) : llvalue =
 
       let maskjptr = build_gep bitjptr [| zero; one |] "maskjptr" builder in
       let maskj = build_load maskjptr "maskj" builder in
-      
+
       let bmjidxjptr = build_gep bmjptr [| const_int (type_of idxj) 0; idxj |] "bmjidxjptr" builder in
       let bmjidxj = build_load bmjidxjptr "bmjidxj" builder in
 
@@ -1063,9 +1081,11 @@ let rec create_Segment (bulksize: int) : llvalue =
 
       let ptr = build_call memalign_ptr [| const_int size_type max_segment_size; const_int size_type max_segment_size |] "ptr" builder in
 
-      let _ = build_call printp_ptr [| ptr |] "" builder in
+      let _ = build_call memset_ptr [| ptr; const_int size_type 0; const_int size_type max_segment_size |] "" builder in
 
       let segmentptr = build_bitcast ptr (pointer_type (segment_type nbbulk bulksize)) "segmentptr" builder in
+
+      let _ = build_call printp_ptr [| ptr |] "" builder in
       
       let _ = build_ret segmentptr builder in
 
@@ -1116,7 +1136,7 @@ let rec create_allocptr (bulksize: int) : llvalue =
       fct
 ;;
 
-
+(*
 (* code gen of every functions *)
 let _ = 
   Array.init (value_ty_size + 2 - 1) (fun i ->
@@ -1144,7 +1164,7 @@ let _ =
   (*let _ = dump_module modul in*)
   ()
 ;;
-
+*)
 (* a test *)
 
 let testfct = 
@@ -1154,29 +1174,26 @@ let testfct =
   let entryb = append_block context "entry" fct in
   let builder = builder context in
   position_at_end entryb builder;
-  let _ =  Array.init (value_ty_size + 2 - 1) (fun i ->
-    let bulksize = i + 2 in
-    let nbbulk = nbbulk_from_bulksize bulksize in
+  
+  let bulksize = 200 in
+  let nbbulk = nbbulk_from_bulksize bulksize in
 
-    printf "bulksize := %d --> nbbulk := %d, ty := %s\n" bulksize nbbulk (string_of_lltype (segment_type nbbulk bulksize)); flush stdout;
-
+  printf "bulksize := %d --> nbbulk := %d, ty := %s\n" bulksize nbbulk (string_of_lltype (segment_type nbbulk bulksize)); flush stdout;
+  
     (* create a segment and its allocation pointer *)
-    let segmentptr = build_call (create_Segment bulksize) [| |] "segmentptr" builder in
-    let allocptr = build_alloca (allocptr_type nbbulk bulksize) "allocptr" builder in
-    let _ = build_call (create_allocptr bulksize) [| segmentptr; allocptr |] "" builder in
-    
+  let segmentptr = build_call (create_Segment bulksize) [| |] "segmentptr" builder in
+  let allocptr = build_alloca (allocptr_type nbbulk bulksize) "allocptr" builder in
+  let _ = build_call (create_allocptr bulksize) [| segmentptr; allocptr |] "" builder in
+  
     (* do some allocation and print it *)
+  let _ = Array.init (nbbulk + 1) (fun i ->
     let bulkptr = build_call (tryAlloc bulksize) [| allocptr |] "bulkptr" builder in
     let ptr = build_bitcast bulkptr (ptri8_type) "ptr" builder in
+    let _ = llvm_printf "allocated bulk* := " builder in
     let _ = build_call printp_ptr [| ptr |] "" builder in
-
-    let bulkptr = build_call (tryAlloc bulksize) [| allocptr |] "bulkptr" builder in
-    let ptr = build_bitcast bulkptr (ptri8_type) "ptr" builder in
-    let _ = build_call printp_ptr [| ptr |] "" builder in
-
     ()
   ) in
-
+  
   let _ = build_ret_void builder in
   
   Llvm_analysis.assert_valid_function fct;
@@ -1185,6 +1202,8 @@ let testfct =
 ;;
 
 let _ = ExecutionEngine.run_function testfct [| |] engine;;
+
+(*let _ = dump_module modul;;*)
 
 (******************* mymms Compiler **********************)
 
