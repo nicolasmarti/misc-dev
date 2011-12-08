@@ -272,7 +272,7 @@ let bitptr_type (nbbulk: int) : lltype =
 let bulkptr_type (bulksize: int) : lltype = pointer_type (bulk_type bulksize);; 
 
 (* the type of an allocation pointer *)
-let allocptr_type (nbbulk: int) (bulksize: int) : lltype = struct_type context [| segment_type nbbulk bulksize; bitptr_type nbbulk; bulkptr_type bulksize |];;
+let allocptr_type (nbbulk: int) (bulksize: int) : lltype = struct_type context [| pointer_type (segment_type nbbulk bulksize); bitptr_type nbbulk; bulkptr_type bulksize |];;
 
 (* the size in bytes of a segments *)
 let segment_size_bytes (nbbulk: int) (value_per_bulk: int) : int =
@@ -529,6 +529,7 @@ let rec isMarked (bulksize: int) (level: int) : llvalue =
   match lookup_function fct_name modul with
     | Some fct -> fct
     | None ->
+
       let fct_ty = function_type bool_type [| pointer_type (struct_type context [| index_ty; mask_ty |]); pointer_type (segment_type nbbulk bulksize) |] in
       let fct = declare_function fct_name fct_ty modul in
 
@@ -574,6 +575,7 @@ let rec blockAddress (bulksize: int) : llvalue =
   match lookup_function fct_name modul with
     | Some fct -> fct
     | None ->
+
       let fct_ty = function_type (pointer_type (bulk_type bulksize)) [| pointer_type (struct_type context [| index_ty; mask_ty |]); pointer_type (segment_type nbbulk bulksize) |] in
       let fct = declare_function fct_name fct_ty modul in
 
@@ -608,6 +610,7 @@ let rec incMaskBit (bulksize: int) (level: int) : llvalue =
   match lookup_function fct_name modul with
     | Some fct -> fct
     | None ->
+
       let fct_ty = function_type bool_type [|pointer_type (struct_type context [| index_ty; mask_ty |]) |] in
       let fct = declare_function fct_name fct_ty modul in
       let _ = set_value_name "bitptr" (params fct).(0) in
@@ -680,6 +683,7 @@ let rec nextMask (bulksize: int) (level: int) : llvalue =
   match lookup_function fct_name modul with
     | Some fct -> fct
     | None ->
+
       let fct_ty = function_type bool_type [| pointer_type (struct_type context [| index_ty; mask_ty |]); pointer_type (segment_type nbbulk bulksize); bool_type |] in
       let fct = declare_function fct_name fct_ty modul in
 
@@ -737,6 +741,7 @@ let rec forwardBitPtr (bulksize: int) (level: int) : llvalue =
   match lookup_function fct_name modul with
     | Some fct -> fct
     | None ->
+
       let fct_ty = function_type bool_type [| pointer_type (allocptr_type nbbulk bulksize) |] in
       let fct = declare_function fct_name fct_ty modul in
 
@@ -754,6 +759,7 @@ let rec forwardBitPtr (bulksize: int) (level: int) : llvalue =
       else
 	(
 	  let segmentptr = build_gep allocptr [| zero; zero |] "segmentptr" builder in
+	  let segmentptr = build_load segmentptr "segmentptr" builder in
 	  let bitptrj = build_gep allocptr [| zero; one; const_int (type_of zero) level |] "bitptrj" builder in
 	  let bitptrjp1 = build_gep allocptr [| zero; one; const_int (type_of zero) (level + 1) |] "bitptrjp1" builder in
 
@@ -798,12 +804,13 @@ let rec forwardBitPtr (bulksize: int) (level: int) : llvalue =
       fct
 ;;
 
-let rec findNextFreeBlock (bulksize: int) (level: int) : llvalue =
+let rec findNextFreeBlock (bulksize: int) : llvalue =
   let nbbulk = nbbulk_from_bulksize bulksize in
-  let fct_name = String.concat "_" ["findNextFreeBlock"; string_of_int bulksize; string_of_int level] in
+  let fct_name = String.concat "_" ["findNextFreeBlock"; string_of_int bulksize ] in
   match lookup_function fct_name modul with
     | Some fct -> fct
     | None ->
+
       let fct_ty = function_type bool_type [| pointer_type (allocptr_type nbbulk bulksize) |] in
       let fct = declare_function fct_name fct_ty modul in
 
@@ -815,6 +822,7 @@ let rec findNextFreeBlock (bulksize: int) (level: int) : llvalue =
       position_at_end entryb builder;
       
       let segmentptr = build_gep allocptr [| zero; zero |] "segmentptr" builder in
+      let segmentptr = build_load segmentptr "segmentptr" builder in
       let bitptr0 = build_gep allocptr [| zero; one; const_int (type_of zero) 0 |] "bitptr0" builder in
 
       let found = build_call (nextMask bulksize 0) [| bitptr0; segmentptr; true_ |] "found" builder in
@@ -854,6 +862,7 @@ let rec setBit (bulksize: int) (level: int) : llvalue =
   match lookup_function fct_name modul with
     | Some fct -> fct
     | None ->
+
       let fct_ty = function_type void_type [| pointer_type (allocptr_type nbbulk bulksize) |] in
       let fct = declare_function fct_name fct_ty modul in
 
@@ -865,6 +874,8 @@ let rec setBit (bulksize: int) (level: int) : llvalue =
       position_at_end entryb builder;
 
       let segmentptr = build_gep allocptr [| zero; zero |] "segmentptr" builder in
+      let segmentptr = build_load segmentptr "segmentptr" builder in
+
       let bitjptr = build_gep allocptr [| zero; one; const_int (type_of zero) level |] "bitptrj" builder in
 
       let bmjptr = build_gep segmentptr [| zero; two; const_int (type_of zero) level |] "bmjptr" builder in
@@ -909,14 +920,204 @@ let rec setBit (bulksize: int) (level: int) : llvalue =
 	()
       );
 
+      Llvm_analysis.assert_valid_function fct;
+      if !optimize then ignore(PassManager.run_function fct pass_manager);
+      fct
+;;
+
+(* 
+   incBulkPtr
+ *)
+let rec incBulkPtr (bulksize: int) : llvalue =
+  let nbbulk = nbbulk_from_bulksize bulksize in
+  let fct_name = String.concat "_" ["incBulkPtr"; string_of_int bulksize] in
+  match lookup_function fct_name modul with
+    | Some fct -> fct
+    | None ->
+
+      let fct_ty = function_type void_type [| pointer_type (bulkptr_type bulksize) |] in
+      let fct = declare_function fct_name fct_ty modul in
+
+      let _ = set_value_name "bulkptr" (params fct).(0) in
+      let bulkptr = (params fct).(0) in
+
+      let entryb = append_block context "entry" fct in
+      let builder = builder context in
+      position_at_end entryb builder;
+
+      let oldbulkptr = build_load bulkptr "oldbulkptr" builder in
+
+      let newbulkptr = build_gep oldbulkptr [| one |] "newbulkptr" builder in
+
+      let _ = build_store newbulkptr bulkptr builder in
+
+      let _ = build_ret_void builder in
       
+      Llvm_analysis.assert_valid_function fct;
+      if !optimize then ignore(PassManager.run_function fct pass_manager);
+      fct
+;;
+
+(* 
+   inc
+ *)
+let rec inc (bulksize: int) : llvalue =
+  let nbbulk = nbbulk_from_bulksize bulksize in
+  let fct_name = String.concat "_" ["inc"; string_of_int bulksize] in
+  match lookup_function fct_name modul with
+    | Some fct -> fct
+    | None ->
+
+      let fct_ty = function_type void_type [| pointer_type (allocptr_type nbbulk bulksize) |] in
+      let fct = declare_function fct_name fct_ty modul in
+
+      let _ = set_value_name "allocptr" (params fct).(0) in
+      let allocptrptr = (params fct).(0) in
+
+      let entryb = append_block context "entry" fct in
+      let builder = builder context in
+      position_at_end entryb builder;
+
+      let bulkptrptr = build_gep allocptrptr [| zero; two |] "bulkptrptr" builder in
+      let _ = build_call (incBulkPtr bulksize) [| bulkptrptr |] "" builder in
+
+      let bitptr = build_gep allocptrptr [| zero; one; zero |] "bitptr" builder in
+      let _ = build_call (incBitPtr bulksize 0) [| bitptr |] "" builder in       
+
+      let _ = build_ret_void builder in
+      
+      Llvm_analysis.assert_valid_function fct;
+      if !optimize then ignore(PassManager.run_function fct pass_manager);
+      fct
+;;
+
+let rec tryAlloc (bulksize: int) : llvalue =
+  let nbbulk = nbbulk_from_bulksize bulksize in
+  let fct_name = String.concat "_" ["tryAlloc"; string_of_int bulksize] in
+  match lookup_function fct_name modul with
+    | Some fct -> fct
+    | None ->
+
+      let fct_ty = function_type (pointer_type (bulk_type bulksize)) [| pointer_type (allocptr_type nbbulk bulksize) |] in
+      let fct = declare_function fct_name fct_ty modul in
+
+      let _ = set_value_name "allocptr" (params fct).(0) in
+      let allocptr = (params fct).(0) in
+
+      let entryb = append_block context "entry" fct in
+      let builder = builder context in
+      position_at_end entryb builder;
+
+      let segmentptr = build_gep allocptr [| zero; zero |] "segmentptr" builder in
+      let segmentptr = build_load segmentptr "segmentptr" builder in
+
+      let bitptr0 = build_gep allocptr [| zero; one; const_int (type_of zero) 0 |] "bitptr0" builder in
+
+      let ismarked = build_call (isMarked bulksize 0) [| bitptr0; segmentptr |] "ismarked" builder in
+
+      let found = append_block context "found" fct in
+      let is_marked = append_block context "is_marked" fct in
+      let not_found = append_block context "not_found" fct in
+
+      let _ = build_cond_br ismarked is_marked found builder in
+
+      position_at_end is_marked builder;
+
+      let is_founded = build_call (findNextFreeBlock bulksize) [| allocptr |] "is_founded" builder in
+      
+      let _ = build_cond_br is_founded found not_found builder in
+      
+      position_at_end not_found builder;
+
+      let _ = build_ret (const_null (pointer_type (bulk_type bulksize))) builder in
+
+      position_at_end found builder;
+
+      let bulkptrptr = build_gep allocptr [| zero; two |] "bulkptrptr" builder in
+      let bulkptr = build_load bulkptrptr "bulkptr" builder in
+
+      let _ = build_call (setBit bulksize 0) [| allocptr |] "" builder in
+
+      let _ = build_call (inc bulksize) [| allocptr |] "" builder in
+
+      let _ = build_ret bulkptr builder in
 
       Llvm_analysis.assert_valid_function fct;
       if !optimize then ignore(PassManager.run_function fct pass_manager);
       fct
 ;;
 
-(* just an example *)
+let rec create_Segment (bulksize: int) : llvalue =
+  let nbbulk = nbbulk_from_bulksize bulksize in
+  let fct_name = String.concat "_" ["create_Segment"; string_of_int bulksize] in
+  match lookup_function fct_name modul with
+    | Some fct -> fct
+    | None ->
+
+      let fct_ty = function_type (pointer_type (segment_type nbbulk bulksize)) [| |] in
+      let fct = declare_function fct_name fct_ty modul in
+
+      let entryb = append_block context "entry" fct in
+      let builder = builder context in
+      position_at_end entryb builder;
+
+      let ptr = build_call memalign_ptr [| const_int size_type max_segment_size; const_int size_type max_segment_size |] "ptr" builder in
+
+      let _ = build_call printp_ptr [| ptr |] "" builder in
+
+      let segmentptr = build_bitcast ptr (pointer_type (segment_type nbbulk bulksize)) "segmentptr" builder in
+      
+      let _ = build_ret segmentptr builder in
+
+      Llvm_analysis.assert_valid_function fct;
+      if !optimize then ignore(PassManager.run_function fct pass_manager);
+      fct
+;;
+
+let rec create_allocptr (bulksize: int) : llvalue =
+  let nbbulk = nbbulk_from_bulksize bulksize in
+  let fct_name = String.concat "_" ["create_allocptr"; string_of_int bulksize] in
+  match lookup_function fct_name modul with
+    | Some fct -> fct
+    | None ->
+
+      let fct_ty = function_type void_type [| pointer_type (segment_type nbbulk bulksize); pointer_type (allocptr_type nbbulk bulksize) |] in
+      let fct = declare_function fct_name fct_ty modul in
+
+      let _ = set_value_name "segmentptr" (params fct).(0) in
+      let segmentptr = (params fct).(0) in
+
+      let _ = set_value_name "allocptr" (params fct).(1) in
+      let allocptr = (params fct).(1) in
+
+      let entryb = append_block context "entry" fct in
+      let builder = builder context in
+      position_at_end entryb builder;
+
+      let segmentptrptr = build_gep allocptr [| zero; zero |] "segmentptrptr" builder in
+      let _ = build_store segmentptr segmentptrptr builder in
+
+      let bitptr0 = build_gep allocptr [| zero; one; const_int (type_of zero) 0 |] "bitptr0" builder in
+      let bulkptr = build_gep allocptr [| zero; two |] "bulkptr" builder in
+      
+      let idx0 = build_gep bitptr0 [| zero; zero |] "idx0" builder in
+      let mask0 = build_gep bitptr0 [| zero; one |] "mask0" builder in
+
+      let _ = build_store (const_null index_ty) idx0 builder in
+      let _ = build_store (const_int mask_ty 1) mask0 builder in
+
+      let bulkptrptr = build_gep segmentptr [| zero; one; zero |] "bulkptrptr" builder in
+      let _ = build_store bulkptrptr bulkptr builder in
+
+      let _ = build_ret_void builder in
+
+      Llvm_analysis.assert_valid_function fct;
+      if !optimize then ignore(PassManager.run_function fct pass_manager);
+      fct
+;;
+
+
+(* code gen of every functions *)
 let _ = 
   Array.init (value_ty_size + 2 - 1) (fun i ->
     let bulksize = i + 2 in
@@ -928,17 +1129,62 @@ let _ =
       let _ = isMarked bulksize i in
       let _ = nextMask bulksize i in
       let _ = forwardBitPtr bulksize i in
-      let _ = findNextFreeBlock bulksize i in
       let _ = setBit bulksize i in 
       ()
     ) in
+    let _ = findNextFreeBlock bulksize in
     let _ = blockAddress bulksize in
+    let _ = incBulkPtr bulksize in
+    let _ = inc bulksize in
+    let _ = tryAlloc bulksize in
     ()
   );
   let _ = indexToBitPtr () in
   let _ = bitptrToIndex () in
-  dump_module modul
+  (*let _ = dump_module modul in*)
+  ()
 ;;
+
+(* a test *)
+
+let testfct = 
+  let fct_name = String.concat "_" ["testAlloc"] in
+  let fct_ty = function_type void_type [| |] in
+  let fct = declare_function fct_name fct_ty modul in
+  let entryb = append_block context "entry" fct in
+  let builder = builder context in
+  position_at_end entryb builder;
+  let _ =  Array.init (value_ty_size + 2 - 1) (fun i ->
+    let bulksize = i + 2 in
+    let nbbulk = nbbulk_from_bulksize bulksize in
+
+    printf "bulksize := %d --> nbbulk := %d, ty := %s\n" bulksize nbbulk (string_of_lltype (segment_type nbbulk bulksize)); flush stdout;
+
+    (* create a segment and its allocation pointer *)
+    let segmentptr = build_call (create_Segment bulksize) [| |] "segmentptr" builder in
+    let allocptr = build_alloca (allocptr_type nbbulk bulksize) "allocptr" builder in
+    let _ = build_call (create_allocptr bulksize) [| segmentptr; allocptr |] "" builder in
+    
+    (* do some allocation and print it *)
+    let bulkptr = build_call (tryAlloc bulksize) [| allocptr |] "bulkptr" builder in
+    let ptr = build_bitcast bulkptr (ptri8_type) "ptr" builder in
+    let _ = build_call printp_ptr [| ptr |] "" builder in
+
+    let bulkptr = build_call (tryAlloc bulksize) [| allocptr |] "bulkptr" builder in
+    let ptr = build_bitcast bulkptr (ptri8_type) "ptr" builder in
+    let _ = build_call printp_ptr [| ptr |] "" builder in
+
+    ()
+  ) in
+
+  let _ = build_ret_void builder in
+  
+  Llvm_analysis.assert_valid_function fct;
+  if !optimize then ignore(PassManager.run_function fct pass_manager);
+  fct
+;;
+
+let _ = ExecutionEngine.run_function testfct [| |] engine;;
 
 (******************* mymms Compiler **********************)
 
