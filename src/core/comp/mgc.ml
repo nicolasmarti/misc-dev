@@ -1364,3 +1364,5 @@ let rec create_Segment () : llvalue =
 let _ = create_Segment ();;
 
 let _ = dump_module modul;;
+
+open Mllvm;;
