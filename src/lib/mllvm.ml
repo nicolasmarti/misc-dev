@@ -44,8 +44,8 @@ and llvmfloatingtype = TFloat
 		       | TQuad
 
 and llvmaggregatetype = TArray of int * llvmtype
-			| TStructure of llvmtype array
-			| TPackedStructure of llvmtype array
+			| TStructure of (string * llvmtype) array
+			| TPackedStructure of (string * llvmtype) array
 			| TVector of int * (llvmintegertype, llvmfloatingtype) either
 			    
 and llvmderivedtype = TAggregate of llvmaggregatetype
@@ -113,6 +113,9 @@ and convop = ITrunc of llvmexpr * llvmtype
 	     | Ptr2I of llvmexpr * llvmtype
 	     | BitCast of llvmexpr * llvmtype
 
+and advancedop = ArrayLookup of llvmexpr * llvmexpr
+		 | StructLookup of llvmexpr * string
+
 and llvmexpr = UnaryOp of unaryop * llvmexpr
 	       | BinaryOp of binaryop * llvmexpr * llvmexpr
 	       | Vectorop of vectorop
@@ -123,8 +126,8 @@ and llvmexpr = UnaryOp of unaryop * llvmexpr
 	       | Select of llvmexpr * llvmexpr * llvmexpr
 	       | Var of var
 	       | Cste of llvmvalue
-	       | Block of string
-	       | Phi of (llvmexpr * blockname) array
+
+	       | AdvancedOp of advancedop
 ;;
 
 type varstore = (string, llvmvalue) Hashtbl.t
@@ -139,16 +142,20 @@ let llvmexpr_semantics (builder: llbuilder) (vst: varstore) (bst: blockstore) : 
 
 
 (* command *)
-type llvmcmd = Store of llvmexpr * llvmexpr
-	       | Let of var * llvmexpr
-	       | ReturnVoid
-	       | Return of llvmexpr
-	       | CondBr of llvmexpr * blockname * blockname
-	       | Br of blockname
+
+type llvmassign = Store of llvmexpr * llvmexpr
+		  | Let of var * llvmexpr
+
+type llvmterminator = ReturnVoid
+		      | Return of llvmexpr
+		      | CondBr of llvmexpr * blockname * blockname
+		      | Br of blockname
+		      | Switch of llvmexpr * blockname * (llvmexpr * blockname) array
 ;;
 
-let llvmcmd_semantics (builder: llbuilder) (vst: varstore) (bst: blockstore) : unit =
-  raise (Failure "llvmcmd_semantics: not yet implemented")
+type llvmcmd = Assign of llvmassign
+	       | Terminator of llvmterminator
+	       | Phi of var * (llvmexpr * blockname) array
 ;;
 
 (* blocks *)
@@ -157,19 +164,28 @@ type llvmblock = {
   code: llvmcmd array;
 };;
 
-let llvmcmd_semantics (builder: llbuilder) (vst: varstore) (bst: blockstore) : unit =
-  raise (Failure "llvmcmd_semantics: not yet implemented")
-;;
-
+(* more abstract language *)
+type cmd = CAssign of llvmassign 
+	   | Ifte of cmd * cmd * cmd 
+	   | Ift of cmd * cmd 
+	   | Loop of cmd * cmd * cmd * bool
+	   | Return of llvmexpr 
 
 (* directive *)
 type name = string;;
 
-type llvmdirective = | Type of ()
-		     | Signature of name * llvmtype
-		     | FunctionImplem of name * (name * llvmtype) array * llvmblock array
-		     | GlobalVar of name * llvmtype * llvmexpr
-		     | GlobalCste of name * llvmtype * llvmexpr
+
+(*
+'code can be 
+* llvmblock array
+* cmd
+
+*)
+type 'code llvmdirective = Type of (name * llvmtype) array
+			   | Signature of name * llvmtype
+			   | FunctionImplem of name * (name * llvmtype) array * 'code
+			   | GlobalVar of name * llvmtype * llvmexpr
+			   | GlobalCste of name * llvmtype * llvmexpr
 ;;
 
 let llvmcmd_semantics (builder: llbuilder) (vst: varstore) (bst: blockstore) : unit =
