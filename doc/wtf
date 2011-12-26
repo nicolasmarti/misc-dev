@@ -1,0 +1,30 @@
+*********************************************
+
+Term / Type: - Type
+       	     - QVar, FVar, PVar
+	     - Cste, Var, 
+	     - Obj
+	     - Lambda
+	     - Let
+	     - Forall
+	     - App
+	     - MatchWith
+
+Definition: - Axiom
+	    - Inductive, Constructor
+	    - Equation
+	    - Class, Object
+	    - TypeClass, TypeInstance
+	    - Interface, Instance
+	    - Module
+	    - Relation, Rules, Request
+
+Store: - Definitions
+       - Dependance Store
+       - DataBase
+
+*********************************************
+
+*) Higher Order Type (type \in term)
+*) Function, application are first order value
+*) Pattern matching
