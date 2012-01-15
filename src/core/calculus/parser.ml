@@ -557,7 +557,7 @@ end pb
 
 type definition = DefSignature of symbol * term
 		  | DefEquation of pattern * term
-		  | DefTerm of term
+		  (*| DefTerm of term*)
 		  | DefInductive of symbol * ((symbol * pos) list * term * nature) list * term * (symbol * term) list
 		  (* the following constructors are not language element per say, but commands *)
 		  | Load of string
@@ -633,9 +633,11 @@ let rec parse_definition (defs: defs) (leftmost: int * int) : definition parsing
     DefEquation (p, te)
   )
   (* finally a free term *)
+(*
   <|> tryrule (fun pb ->
-    DefTerm (parse_term defs leftmost pb)
+  DefTerm (parse_term defs leftmost pb)
   )
+*)
 
 let parse_onedefinition defs : (int * definition) parsingrule = 
   fun pb -> 
@@ -646,3 +648,4 @@ let parse_onedefinition defs : (int * definition) parsingrule =
     let () = whitespaces pb in
     let posend = pb.beginpointer in  
     posend - posstart - 1, def
+

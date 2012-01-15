@@ -259,6 +259,41 @@ let _ =
       )
 ;;
 
+let _ =
+    python_interfaced_function 
+      ~register_as:"Doudou.eval"
+      ~docstring:"enter a term"
+      [|StringType|]
+      (fun [| str |] ->
+	let str = pystring_asstring str in
+	(* we set the parser *)
+	let lines = stream_of_string str in
+	(* we save the context and the defs *)
+	let saved_ctxt = !ctxt in
+	let saved_defs = copy_defs !defs in
+	(*if verbose then printf "input:\n%s\n" str;*)
+	let pb = build_parserbuffer lines in
+	try
+	  let startpos = cur_pos pb in
+
+	  let te = parse_term !defs startpos pb in
+
+	  let te, ty = process_term defs ctxt te in
+
+	  pytuple_fromarray (Array.map (marshal_doudou_python createValue_function) [| te; ty |])
+
+	with
+	  (* TODO: return proper python exception *)
+	  | NoMatch -> 
+	    raise (Failure (String.concat "\n" ["parsing error in:"; Buffer.contents pb.bufferstr; errors2string pb]))
+	  | DoudouException err -> 
+	    (* we restore the context and defs *)
+	    ctxt := saved_ctxt;
+	    defs := saved_defs;
+	    raise (Failure (error2string err))
+      )
+;;
+
 let _ = 
   python_interfaced_function 
     ~register_as:"Doudou.undo"
@@ -283,6 +318,18 @@ let _ =
 
     )
 ;;  
+
+let _ = 
+  python_interfaced_function 
+    ~register_as:"Doudou.showdefs"
+    ~docstring:"undo last defs"
+    [||]
+    (fun [| |] ->
+      let s = defs2string !defs in
+      pystring_fromstring s
+    )
+;;  
+
 
 let _ = python_exec "import Doudou";;
 
