@@ -14,7 +14,7 @@
 
   <definitions>
     <!-- here's the main context -->
-    <context id="doudou" class="no-spell-check">
+    <context id="mymms" class="no-spell-check">
       <include>
 	<!-- Flow control & common keywords -->
 	<context id="keywords" style-ref="keyword">
