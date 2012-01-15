@@ -73,7 +73,11 @@ let function_ = fun tys ty is_var_arg ->
 ;;
 let pointer = fun ty -> TDerived (TPointer ty);;
 
-let llvmtype2lltype (ty: llvmtype) : lltype =
+
+type typestore = (string, llvmtype) Hashtbl.t
+;;
+
+let llvmtype2lltype (ty: llvmtype) (tyst: typestore) : lltype =
   raise (Failure "llvmtype2lltype: not yet implemented")
 ;;
 
@@ -136,7 +140,7 @@ type varstore = (string, llvmvalue) Hashtbl.t
 type blockstore = (string, llbasicblock) Hashtbl.t
 ;;
 
-let llvmexpr_semantics (builder: llbuilder) (vst: varstore) (bst: blockstore) : unit =
+let llvmexpr_semantics (builder: llbuilder) (tyst: typestore) (vst: varstore) (bst: blockstore) : unit =
   raise (Failure "llvmexpr_semantics: not yet implemented")
 ;;
 
@@ -188,6 +192,6 @@ type 'code llvmdirective = Type of (name * llvmtype) array
 			   | GlobalCste of name * llvmtype * llvmexpr
 ;;
 
-let llvmcmd_semantics (builder: llbuilder) (vst: varstore) (bst: blockstore) : unit =
+let llvmcmd_semantics (builder: llbuilder) (tyst: typestore) (vst: varstore) (bst: blockstore) : unit =
   raise (Failure "llvmcmd_semantics: not yet implemented")
 ;;
