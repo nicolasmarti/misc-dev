@@ -1,6 +1,7 @@
 open Pycaml;;
 
 open Interp;;
-open Comp;;
+
+(*open Comp;;*)
 
 pymain Sys.argv;;
