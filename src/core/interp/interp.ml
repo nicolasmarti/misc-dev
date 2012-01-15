@@ -81,7 +81,10 @@ let _ = python_exec "class Value:
      # decref the term registered by id
      def __del__(self):
          #print \"__del__(\" + str(self.id) + \")\"
-         Doudou.decref(self.id)
+         try:
+             Doudou.decref(self.id)
+         except:
+             return None
 
      # return the string representation
      def __str__(self):
