@@ -150,20 +150,34 @@ let rec process_definition ?(verbose: bool = false) (defs: defs ref) (ctxt: cont
       if verbose then printf "Equation: %s \n" (equation2string !ctxt (p, te)); flush Pervasives.stdout;
       []
       
-    | DefTerm te ->
-      (* we infer the term type *)
-      let te, ty = typeinfer !defs ctxt te in
-      let te = reduction !defs ctxt clean_term_strat te in
-      let ty = reduction !defs ctxt clean_term_strat ty in
-      (* we flush the free vars so far *)
-      let [te; ty] = flush_fvars ctxt [te; ty] in
-      (* just print that everything is fine *)
-      if verbose then printf "Term |- %s :: %s \n" (term2string !ctxt te) (term2string !ctxt ty); flush Pervasives.stdout;
-      []
-
     | Load filename ->
       load_definitions defs ctxt ~verbose:verbose (String.concat "." [filename; "doudou"]);
       List.hd !defs.hist
+
+(* for the REPL *)
+and process_term ?(verbose: bool = false) (defs: defs ref) (ctxt: context ref) (te: term) : term * term =
+  let saved_ctxt = !ctxt in
+  let saved_defs = copy_defs !defs in
+  try
+    (* we infer the term type *)
+    let te, ty = typeinfer !defs ctxt te in
+    let te = reduction !defs ctxt clean_term_strat te in
+    let ty = reduction !defs ctxt clean_term_strat ty in
+    (* we flush the free vars so far *)
+    let [te; ty] = flush_fvars ctxt [te; ty] in
+    (* just print that everything is fine *)
+    if verbose then printf "Term |- %s :: %s \n" (term2string !ctxt te) (term2string !ctxt ty); flush Pervasives.stdout;
+    te, ty
+
+  with
+    | DoudouException err -> 
+      (* we restore the context and defs *)
+      ctxt := saved_ctxt;
+      defs := saved_defs;
+      if verbose then printf "error:\n%s\n" (error2string err);
+      raise (DoudouException err)
+
+
 
 (* parse definition from a parserbuffer *)
 and parse_process_definition (defs: defs ref) (ctxt: context ref) ?(verbose: bool = false) (pb: parserbuffer) : unit =
