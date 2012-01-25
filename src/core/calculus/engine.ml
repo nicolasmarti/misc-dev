@@ -200,6 +200,9 @@ and unification_term_term (defs: defs) (ctxt: context ref) (te1: term) (te2: ter
 	    (* if just one equation, we might want to unfold *)
 	    | Equation [PCste (c2, _), te] when c1 = c2 ->
 	      unification_term_term defs ctxt te te2
+	    (* if c1 is a primitive, we unfold it *)
+	    | Primitive o ->
+	      unification_term_term defs ctxt (Obj (o, nopos)) te2
 	    (* these case is impossible *)
 	    | Equation [PCste (c2, _), te] when c1 <> c2 ->
 	      raise (DoudouException (FreeError "Catastrophic: an equation for a constante has a different constante symbol"))
@@ -219,6 +222,9 @@ and unification_term_term (defs: defs) (ctxt: context ref) (te1: term) (te2: ter
 	    (* if just one equation, we might want to unfold *)
 	    | Equation [PCste (c1, _), te] when c1 = c2 ->
 	      unification_term_term defs ctxt te1 te 
+	    (* if c2 is a primitive, we unfold it *)
+	    | Primitive o ->
+	      unification_term_term defs ctxt te1 (Obj (o, nopos))
 	    (* these case is impossible *)
 	    | Equation [PCste (c1, _), te] when c1 <> c2 ->
 	      raise (DoudouException (FreeError "Catastrophic: an equation for a constante has a different constante symbol"))
