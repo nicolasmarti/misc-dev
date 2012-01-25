@@ -12,6 +12,17 @@ open Context;;
 
 let defs = ref (empty_defs ());;
 
+(*
+  here we add all primitives types / functions
+*)
+
+open Primitive_float;;
+
+Hashtbl.add (!defs).store "Float" (Name "Float", floattypeobj#get_type, Primitive floattypeobj#my_self);;
+
+(**)
+
+
 let ctxt = ref empty_context;;
 
 let pyobject_registry : (int, (term * int)) Hashtbl.t = Hashtbl.create 100;;

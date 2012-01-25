@@ -21,9 +21,10 @@ object (self)
       false	
 end;;
 
+let floattypeobj = new floatTypeObj;;
+
 let floatType = 
-  let o = new floatTypeObj in
-    Obj (o#my_self, nopos)
+  Obj (floattypeobj#my_self, nopos)
 ;;
 
 let float_value_uuid = get_fresh_uuid ();;

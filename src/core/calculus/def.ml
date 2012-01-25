@@ -132,6 +132,7 @@ and value = Inductive of symbol list
 	    | Axiom
 	    | Constructor
 	    | Equation of equation list
+	    | Primitive of (term, context, defs) tObj
 
 (* definitions *)
 and defs = {
