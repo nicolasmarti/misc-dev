@@ -8,6 +8,9 @@ from threading import *
 from datetime import *
 from pytz import timezone
 import pytz
+import sys
+
+gtk.gdk.threads_init()
 
 class WorldClockWindow(gtk.Window, Thread):
 
@@ -47,3 +50,24 @@ class WorldClockWindow(gtk.Window, Thread):
         gtk.main_quit()
         return False
 
+def main():
+    gtk.gdk.threads_enter()
+    gtk.main()
+    gtk.gdk.threads_leave()
+
+
+if __name__ == '__main__':
+
+    glock = Lock()
+    
+    win = WorldClockWindow(glock)
+
+    #win.connect('destroy', lambda win: gtk.main_quit())
+
+    win.start()
+
+    win.show()
+
+    main()
+
+    sys.exit(0)
