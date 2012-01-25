@@ -2,13 +2,13 @@
 
 Term / Type: - Type
        	     - QVar, FVar, PVar
-	     - Cste, Var, 
+	     - Cste, DVar, 
 	     - Obj
 	     - Lambda
 	     - Let
 	     - Forall
 	     - App
-	     - MatchWith
+	     - MatchWith 
 
 Definition: - Axiom
 	    - Inductive, Constructor
@@ -17,7 +17,7 @@ Definition: - Axiom
 	    - TypeClass, TypeInstance
 	    - Interface, Instance
 	    - Module
-	    - Relation, Rules, Request
+	    - Relation/Predicate/Mode, Rules, Request
 
 Store: - Definitions
        - Dependance Store
@@ -25,6 +25,20 @@ Store: - Definitions
 
 *********************************************
 
-*) Higher Order Type (type \in term)
+*) Higher Order Type (type === term)
 *) Function, application are first order value
-*) Pattern matching
+*) Pattern matching (any term) / Destruction (only application of constructor of inductive types and variable)
+*) predicate on type (typeclass & interface): build inductives type (with type as parameter), functions (with inductive type on type as implicit argument), oracle for the inductive (on typeinstance)
+
+*********************************************
+
+<symbol> :: <term>
+
+<pattern> := <term>
+
+Inductive <symbol> <arg>* [:: <type>] :=
+(| <symbol> :: <term>)*
+
+Class <symbol> <arg>* where
+  <def>
+
