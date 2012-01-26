@@ -3,6 +3,7 @@ open Misc
 open Substitution
 open Extlist
 open Libparser
+open Printf
 
 (* push the bvars of a pattern in a context *)
 let push_pattern_bvars (ctxt: context) (l: (name * term * term) list) : context =
@@ -267,7 +268,7 @@ let undoDefinition (defs: defs ref) : symbol list =
       List.flatten l
 
 (* this function rewrite all free vars that have a real value in the upper frame of a context into a list of terms, and removes them *)
-let rec flush_fvars (ctxt: context ref) (l: term list) : term list =
+let rec flush_fvars (defs: defs) (ctxt: context ref) (l: term list) : term list =
   (*if !debug then printf "before flush_vars: %s\n" (context2string !ctxt);*)
   let hd, tl = List.hd !ctxt, List.tl !ctxt in
   (* we compute the fvars of the terms *)
@@ -276,10 +277,10 @@ let rec flush_fvars (ctxt: context ref) (l: term list) : term list =
   let (terms, fvs) = fold_cont (fun (terms, fvs) ((i, ty, te)::tl) ->
     match te with
       | TVar (i', _) when not (IndexSet.mem i' lfvs) ->
-	(* there is no value for this free variable, and it does not appears in the terms --> remove it *)
+	(* there is no value for this free variable, and it does not appear in the terms --> remove it *)
 	tl, (terms, fvs)
       | TVar (i', _) when IndexSet.mem i' lfvs ->
-	(* there is no value for this free variable, but it does not appears in the terms --> keep it *)
+	(* there is no value for this free variable, but it does appear in the terms --> keep it *)
 	tl, (terms, fvs @ [i, ty, te])
       | _ -> 
       (* there is a value, we can get rid of the free var *)
@@ -291,17 +292,36 @@ let rec flush_fvars (ctxt: context ref) (l: term list) : term list =
   ) (l, []) (List.rev hd.fvs) in
   (* here we are removing the free vars and putting them bellow only if they have no TVar 0 in their term/type *)
   (* first we shift them *)
-  let fvs = List.fold_left (fun acc (i, ty, te) ->
+  let terms, fvs = List.fold_left (fun (terms, acc) (i, ty, te) ->
     try 
-      acc @ [i, shift_term ty (-1), shift_term te (-1)]
+      terms, (acc @ [i, shift_term ty (-1), shift_term te (-1)])
     with
       | DoudouException (Unshiftable_term _) ->
-	(* we have a free variable that has a type / value containing the symbol in hd -> game over we failed *)
+	(* we have a free variable that has a type / value containing the symbol in hd -> 
+	   we try to ask an oracle if it can guess the term
+	*)
+	if !debug_oracles then printf "flush_fvars asks to oracles: %s\n" (!term2string_ptr !ctxt ty);
+	let guessed_value = fold_stop (fun () oracle ->
+	  match oracle (defs, !ctxt, ty) with
+	    | None -> Left ()
+	    | Some prf ->
+		(* we check the proof *)
+	      try 
+		let _ = !typecheck_ptr defs ctxt prf ty in
+		if not (IndexSet.mem i (fv_term te)) then Right prf else Left ()
+	      with
+		| _ -> 		  
+		  Left ()
+	) () !oracles_list in
 	raise (DoudouException (FreeError "we failed to infer a free variable that cannot be out-scoped"))
-  ) [] (List.rev fvs) in
+  ) (terms, []) (List.rev fvs) in
   (match tl with
-    (* we are in toplevel do nothing *)
-    | [] -> ctxt := ({hd with fvs = fvs})::tl
+    (* we are in toplevel, we return an error if there is still free variables *)
+    | [] -> 
+      if List.length fvs = 0 then
+	ctxt := ({hd with fvs = []})::tl
+      else
+	raise (DoudouException (FreeError "flush_fvars failed because the term still have freevariables"))
     (* we are not in toplevel -> we copy the fvs (that have been shifted), to the previous level *)
     | hd'::tl -> ctxt := ({hd with fvs = []})::({hd' with fvs = fvs @ hd'.fvs})::tl
   ); 
@@ -315,9 +335,9 @@ let push_quantification (q : symbol * term * nature * pos) (ctxt: context ref) :
   let new_frame = build_new_frame s ~nature:n ~pos:p (shift_term ty 1) in
   ctxt := new_frame::!ctxt
 
-let pop_quantification (ctxt: context ref) (tes: term list) : (symbol * term * nature * pos) * term list =
+let pop_quantification (defs: defs) (ctxt: context ref) (tes: term list) : (symbol * term * nature * pos) * term list =
   (* we flush the free variables *)
-  let tes = flush_fvars ctxt tes in
+  let tes = flush_fvars defs ctxt tes in
   (* we grab the remaining context and the popped frame *)
   let ctxt', frame = pop_frame (!ctxt) in
   (* we set the context *)
@@ -325,11 +345,11 @@ let pop_quantification (ctxt: context ref) (tes: term list) : (symbol * term * n
   (* and returns the quantifier *)
   (frame.symbol, shift_term frame.ty (-1), frame.nature, frame.pos), tes  
 
-let rec pop_quantifications (ctxt: context ref) (tes: term list) (n: int) : (symbol * term * nature * pos) list * term list =
+let rec pop_quantifications (defs: defs) (ctxt: context ref) (tes: term list) (n: int) : (symbol * term * nature * pos) list * term list =
   match n with
     | _ when n < 0 -> raise (DoudouException (FreeError "Catastrophic: negative n in pop_quantifications"))
     | 0 -> [], tes
     | _ ->
-      let hd, tes = pop_quantification ctxt tes in
-      let tl, tes = pop_quantifications ctxt tes (n-1) in
+      let hd, tes = pop_quantification defs ctxt tes in
+      let tl, tes = pop_quantifications defs ctxt tes (n-1) in
       hd::tl, tes
