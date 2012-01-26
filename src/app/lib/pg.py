@@ -77,6 +77,13 @@ class PG(gtksourceview2.View, keybinding.KeyBinding):
              )
             )
 
+        # C-c C-f -> print defs
+        self.keyactions.append(
+            ([Set([65507, 99]), Set([65507,102])],
+             lambda s: s.show_context()
+             )
+            )
+
         # C-c C-u -> undo last definition
         self.keyactions.append(
             ([Set([65507, 99]), Set([65507,117])],
@@ -194,6 +201,10 @@ class PG(gtksourceview2.View, keybinding.KeyBinding):
     #show defs
     def show_defs(self):
         error_dialog(self.get_toplevel(), Doudou.showdefs())
+
+    #show context
+    def show_context(self):
+        error_dialog(self.get_toplevel(), Doudou.showcontext())
 
     # undo last definition
     def undo(self):
