@@ -174,3 +174,35 @@ type doudou_error = NegativeIndexBVar of index
 		    | FreeError of string
 
 exception DoudouException of doudou_error
+
+(*
+  this is a updateable list of oracles: basically functions which are given a defs, a context, and a term ty, and which purpose is to find a term which has type ty
+
+  it can be use in several cases:
+  - for helping the substitution algorithm (in this case goals are about equality or inequality)
+  - for flushing fvars (this can be used for implementation of typeclass instance)
+*)
+
+let oracles_list : ((defs * context * term) -> term option) list ref = ref []
+
+(* this is really a strange thing, but due to the mutual recursion between 
+   flush_fvars and typecheck, we create a pointer to typecheck ...
+   HORRIBLE!
+
+   idem for term2string
+*)
+
+let typecheck_ptr : (defs -> context ref -> term -> term -> term * term) ref =
+  ref (fun d c t1 t2 -> raise (Failure "catastrophic: typecheck_ptr is not properly initialized"))
+;;
+
+let term2string_ptr : (context -> term -> string) ref =
+  ref (fun c t -> raise (Failure "catastrophic: term2string_ptr is not properly initialized"))
+;;
+
+(* a few debug verbose flags *)
+
+let debug = ref false
+
+let debug_oracles = ref false
+

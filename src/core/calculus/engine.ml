@@ -12,10 +12,6 @@ open Extlist
 (*************************************************************)
 
 
-let debug = ref false
-
-let debug_oracles = ref false
-
 (*
   reduction of terms
   several strategy are possible:
@@ -74,12 +70,6 @@ exception IotaReductionFailed
   
   this last case is caught, and we try to ask oracles if they can prove that the term are equal (actually, just that if for any predicate they are undistinguisheable, in which case the UnknownUnification become the empty unification) or different (equality implies False)
 *)
-
-(*
-  this is a updateable list of oracles: basically functions which are given a defs, a context, and a term ty, and which purpose is to find a term which has type ty
-*)
-
-let unification_oracles_list : ((defs * context * term) -> term option) list ref = ref []
 
 (*
  
@@ -248,7 +238,7 @@ and unification_term_term (defs: defs) (ctxt: context ref) (te1: term) (te2: ter
 	    (* we unify *)
 	    let te = unification_term_term defs ctxt te1 te2 in
 	    (* we pop quantification *)
-	    let q1, [te] = pop_quantification ctxt [te] in
+	    let q1, [te] = pop_quantification defs ctxt [te] in
 	    (* and we return the term *)
 	    Impl (q1, te, p1)
 	      
@@ -267,7 +257,7 @@ and unification_term_term (defs: defs) (ctxt: context ref) (te1: term) (te2: ter
 	    (* we unify *)
 	    let te = unification_term_term defs ctxt te1 te2 in
 	    (* we pop quantification *)
-	    let q1, [te] = pop_quantification ctxt [te] in
+	    let q1, [te] = pop_quantification defs ctxt [te] in
 	    (* and we return the term *)
 	    Lambda (q1, te, p1)
 
@@ -428,7 +418,7 @@ and unification_term_term (defs: defs) (ctxt: context ref) (te1: term) (te2: ter
 		  Right ()
 		with
 		  | _ -> Left ()
-	  ) () !unification_oracles_list in
+	  ) () !oracles_list in
 	  match equality_result with
 	    | Right _ ->
 	    (* we have a proof of equality, we can return the term te1 *)
@@ -447,7 +437,7 @@ and unification_term_term (defs: defs) (ctxt: context ref) (te1: term) (te2: ter
 		      Right ()
 		    with
 		      | _ -> Left ()
-	      ) () !unification_oracles_list in
+	      ) () !oracles_list in
 	      match inequality_result with
 		| Right _ ->
 		(* we have a proof of inequality, we can return that the term cannot unify *)
@@ -502,7 +492,7 @@ and reduction (defs: defs) (ctxt: context ref) (strat: reduction_strategy) (te: 
 	(* we reduce the body *)
 	let te = reduction defs ctxt strat te in
 	(* we pop the quantification *)
-	let q1, [te] = pop_quantification ctxt [te] in
+	let q1, [te] = pop_quantification defs ctxt [te] in
 	(* and we return the term *)
 	Impl (q1, te, p1)
 
@@ -523,7 +513,7 @@ and reduction (defs: defs) (ctxt: context ref) (strat: reduction_strategy) (te: 
 	(* we reduce the body *)
 	let te = reduction defs ctxt strat te in
 	(* we pop the quantification *)
-	let q1, [te] = pop_quantification ctxt [te] in
+	let q1, [te] = pop_quantification defs ctxt [te] in
 	(* and we return the term *)
 	Lambda (q1, te, p)
 
@@ -711,7 +701,7 @@ and typeinfer (defs: defs) (ctxt: context ref) (te: term) : term * term =
       (* we typecheck te :: Type *)
       let te, ty' = typecheck defs ctxt te (Type nopos) in
       (* we pop quantification *)
-      let q1, [te] = pop_quantification ctxt [te] in
+      let q1, [te] = pop_quantification defs ctxt [te] in
       (* and we returns the term with type Type *)
       Impl (q1, te, p), ty'
 
@@ -723,7 +713,7 @@ and typeinfer (defs: defs) (ctxt: context ref) (te: term) : term * term =
       (* we typeinfer te *)
       let te, tety = typeinfer defs ctxt te in
       (* we pop quantification *)
-      let q1, [te; tety] = pop_quantification ctxt [te; tety] in
+      let q1, [te; tety] = pop_quantification defs ctxt [te; tety] in
       (* and we returns the term with type Type *)
       Lambda (q1, te, p), Impl (q1, tety, nopos)
 
@@ -851,7 +841,7 @@ and typeinfer (defs: defs) (ctxt: context ref) (te: term) : term * term =
 	(* and we typecheck the rhs *)
 	let rhs, rhsty = typecheck defs ctxt rhs (TVar (fvte, nopos)) in
 	(* we pop all the quantifications *)
-	let _ = pop_quantifications ctxt [] (pattern_size lhs') in
+	let _ = pop_quantifications defs ctxt [] (pattern_size lhs') in
 	(* returns the equation *)
 	lhs', rhs
       ) eqs in
@@ -965,7 +955,7 @@ and typecheck_equation (defs: defs) (ctxt: context ref) (lhs: pattern) (rhs: ter
   close_context ctxt;  
   (* and we typecheck the rhs *)
   let rhs, rhsty = typecheck defs ctxt rhs lhsty in
-  let _ = pop_quantifications ctxt [] (pattern_size lhs') in
+  let _ = pop_quantifications defs ctxt [] (pattern_size lhs') in
   (*ctxt := drop (pattern_size lhs') !ctxt;*)
   lhs', rhs
 
@@ -1040,4 +1030,7 @@ and rewrite_term (defs: defs) (ctxt: context) (lhs: term) (rhs: term) (te: term)
 		   rewrite_term defs ctxt' lhs' rhs' body),
 		  p'
 	  )
+;;
 		  
+let _ = typecheck_ptr := typecheck
+;;
