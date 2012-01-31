@@ -437,6 +437,8 @@ let defs2token (defs: defs) : token =
   Box (
     Hashtbl.fold (fun key value acc ->
       match value with
+	| (s, ty, Equation [PCste (s', _), te]) ->
+	  acc @ [Box [Verbatim (symbol2string s); Space 1; Verbatim ":="; term2token [] te Alone; Space 1; Verbatim "::"; Space 1; term2token [] ty Alone]; Newline]
 	| (s, ty, _) ->
 	  acc @ [Box [Verbatim (symbol2string s); Space 1; Verbatim "::"; Space 1; term2token [] ty Alone]; Newline]
     ) defs.store [] @ 
@@ -469,3 +471,5 @@ let defs2string (defs: defs) : string =
   let token = defs2token defs in
   let box = token2box token 80 2 in
   box2string box
+
+let _ = term2string_ptr := term2string

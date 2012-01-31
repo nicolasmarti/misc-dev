@@ -12,6 +12,17 @@ open Context;;
 
 let defs = ref (empty_defs ());;
 
+(*
+  here we add all primitives types / functions
+*)
+
+open Primitive_float;;
+
+Hashtbl.add (!defs).store "Float" (Name "Float", floattypeobj#get_type, Primitive floattypeobj#my_self);;
+
+(**)
+
+
 let ctxt = ref empty_context;;
 
 let pyobject_registry : (int, (term * int)) Hashtbl.t = Hashtbl.create 100;;
@@ -325,10 +336,21 @@ let _ =
 let _ = 
   python_interfaced_function 
     ~register_as:"Doudou.showdefs"
-    ~docstring:"undo last defs"
+    ~docstring:"show the defs"
     [||]
     (fun [| |] ->
       let s = defs2string !defs in
+      pystring_fromstring s
+    )
+;;  
+
+let _ = 
+  python_interfaced_function 
+    ~register_as:"Doudou.showcontext"
+    ~docstring:"show the context"
+    [||]
+    (fun [| |] ->
+      let s = context2string !ctxt in
       pystring_fromstring s
     )
 ;;  

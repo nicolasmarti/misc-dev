@@ -1,0 +1,18 @@
+addTypeClass (A :: Type) :: Type :=
+| addInstance :: (A -> A -> A) -> addTypeClass A
+
+(+) :: {A :: Type} -> {addTypeClass A} -> A -> A -> A
+(+) {A} {addInstance f} x y := f x y
+
+nat :: Type := | O :: nat | S :: nat -> nat
+
+natplus :: nat -> nat -> nat
+natplus O y := y
+natplus x O := x
+natplus (S x) y := S (natplus x y)
+
+addnat :: addTypeClass nat
+addnat := addInstance natplus
+
+dodo :: nat 
+dodo := O + O

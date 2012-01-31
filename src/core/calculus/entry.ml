@@ -113,7 +113,7 @@ let rec process_definition ?(verbose: bool = false) (defs: defs ref) (ctxt: cont
       (* we remove the definition of the inductive type *)
       let _ = undoDefinition defs in
       (* now we can pop the quantifiers *)
-      let qs = List.rev (List.map (fun _ -> fst (pop_quantification ctxt [])) args) in
+      let qs = List.rev (List.map (fun _ -> fst (pop_quantification !defs ctxt [])) args) in
       (* pop the inductive types type *)
       let [ind_ty] = pop_terms ctxt 1 in
       if verbose then printf "Inductive: %s :: %s\n" (symbol2string s) (term2string !ctxt ind_ty);      
@@ -133,7 +133,7 @@ let rec process_definition ?(verbose: bool = false) (defs: defs ref) (ctxt: cont
       (* we typecheck the type against Type *)
       let ty, _ = typecheck !defs ctxt ty (Type nopos) in	  
       (* we flush the free vars so far *)
-      let [ty] = flush_fvars ctxt [ty] in
+      let [ty] = flush_fvars !defs ctxt [ty] in
       (* add to the defs *)
       addAxiom defs s ty;
       (* just print that everything is fine *)
@@ -143,7 +143,7 @@ let rec process_definition ?(verbose: bool = false) (defs: defs ref) (ctxt: cont
     | DefEquation (PCste (s, spos) as p, te) | DefEquation (PApp ((s, spos), _, _, _) as p, te) ->
       let p, te = typecheck_equation !defs ctxt p te in
       (* we flush the free vars so far *)
-      let [] = flush_fvars ctxt [] in
+      let [te] = flush_fvars !defs ctxt [te] in
       (* add to the defs *)
       addEquation defs s (p, te);
       (* just print that everything is fine *)
@@ -164,7 +164,7 @@ and process_term ?(verbose: bool = false) (defs: defs ref) (ctxt: context ref) (
     let te = reduction !defs ctxt clean_term_strat te in
     let ty = reduction !defs ctxt clean_term_strat ty in
     (* we flush the free vars so far *)
-    let [te; ty] = flush_fvars ctxt [te; ty] in
+    let [te; ty] = flush_fvars !defs ctxt [te; ty] in
     (* just print that everything is fine *)
     if verbose then printf "Term |- %s :: %s \n" (term2string !ctxt te) (term2string !ctxt ty); flush Pervasives.stdout;
     te, ty

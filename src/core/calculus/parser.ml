@@ -8,6 +8,20 @@ open Primitive
 (* parser (lib/parser.ml version) *)
 (**********************************)
 
+open Primitive_float
+open Str
+open Printf
+
+let float_parser : float parsingrule =
+  applylexingrule (regexp "[0-9]+.[0-9]*", 
+		   fun (s:string) -> 
+		     try
+		       float_of_string s
+		     with
+		       | _ -> printf "cannot make a float of %s." s; raise NoMatch
+  )
+;;
+
 let at_start_pos (startp: (int * int)) (p: 'a parsingrule) : 'a parsingrule =
   fun pb ->
     let curp = cur_pos pb in
@@ -35,8 +49,6 @@ let with_pos (p: 'a parsingrule) : ('a * pos) parsingrule =
 
 let doudou_keywords = ["Type"; "::"; ":="; "->"; "match"; "with"]
 
-open Str;;
-
 let parse_reserved : unit parsingrule =
   foldp (List.map (fun x -> keyword x ()) doudou_keywords)
 
@@ -48,6 +60,8 @@ let name_parser : name parsingrule = applylexingrule (regexp "[a-zA-Z][a-zA-Z0-9
 let parse_avar : unit parsingrule = applylexingrule (regexp "_", 
 						     fun (s:string) -> ()
 )
+
+
 
 let parse_symbol_name (defs: defs) : symbol parsingrule =
   foldp (skipmap (fun s ->
@@ -438,6 +452,12 @@ and parse_term_lvl2 (defs: defs) (leftmost: (int * int)) (pb: parserbuffer) : te
     let n, pos = at_start_pos leftmost (with_pos name_parser) pb in
     let () = whitespaces pb in
     TName (Name n, pos)
+  )
+  <|> tryrule (fun pb ->
+    let () = whitespaces pb in
+    let f, pos = at_start_pos leftmost (with_pos float_parser) pb in
+    let () = whitespaces pb in
+    set_term_pos (create_floatTerm f) pos
   )
   <|> (fun pb -> 
     let () = whitespaces pb in
