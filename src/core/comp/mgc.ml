@@ -102,30 +102,22 @@ let bitmap_size (nbbulk: int) : int =
 (* the header of a segment: some sizeless representation which allow manipulation of any segment *)
 (* the header of a heap: some sizeless representation which allow manipulation of any heap *)
 let headers : lltype * lltype = 
-  let seghd_ty = opaque_type context in
-  let heaphd_ty = opaque_type context in
-  let seghd_handle = handle_to_type seghd_ty in
-  let heaphd_handle = handle_to_type heaphd_ty in
+  let seghd_ty = named_struct_type context "seghd_ty" in
+  let heaphd_ty = named_struct_type context "heaphd_ty" in
 
-  let seghd_recdef = 
-    struct_type context [|
+  let () = 
+    struct_set_body seghd_ty [|
       pointer_type seghd_ty; (* prev *)
       pointer_type seghd_ty; (* next *)
       pointer_type heaphd_ty; (* heap header *)
-			|] in
-  let heaphd_recdef = 
-    struct_type context [| 
+			|] false in
+  let () = 
+    struct_set_body heaphd_ty [| 
       pointer_type (function_type void_type [| value_type; pointer_type seghd_ty |]); (* mark_and_push *) 
       pointer_type (function_type void_type [| pointer_type seghd_ty |]); (* clear *)
       pointer_type (function_type void_type [| value_type; pointer_type seghd_ty |]) (* free *)
-			|] in
+			|] false in
 
-  let _ = refine_type seghd_ty seghd_recdef in
-  let _ = refine_type heaphd_ty heaphd_recdef in
-  let seghd_ty = type_of_handle seghd_handle in
-  let heaphd_ty = type_of_handle heaphd_handle in
-  let _ = define_type_name "segment_header" seghd_ty modul in
-  let _ = define_type_name "heap_header" heaphd_ty modul in
   (seghd_ty, heaphd_ty)
 ;;
 
@@ -231,7 +223,6 @@ let heap, heap_ty =
   let heap_name = "heap" in
   printf "|heap| := %d o\n" init_heap_size;
   printf "|heap| := %d ko\n" (init_heap_size / 1024);
-  let _ = define_type_name "heap" heap_ty modul in
   define_global heap_name init_heap modul, pointer_type heap_ty
 ;;
 
@@ -1355,6 +1346,8 @@ let rec create_Segment () : llvalue =
       let _ = build_store new_segmentptr segmentsptrptr builder in      
 
       let _ = build_ret_void builder in
+
+      dump_value fct;
 
       Llvm_analysis.assert_valid_function fct;
       if !optimize then ignore(PassManager.run_function fct pass_manager);
