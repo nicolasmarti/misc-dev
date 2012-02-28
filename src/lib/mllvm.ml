@@ -75,14 +75,14 @@ let function_ = fun tys ty is_var_arg ->
 let pointer = fun ty -> TDerived (TPointer ty);;
 
 
-type typestore = (string, llvmtype) Hashtbl.t
+type typestore = (string, (llvmtype * lltype)) Hashtbl.t
 ;;
 
 let rec llvmtype2lltype (ty: llvmtype) (tyst: typestore) (ctxt: llcontext) : lltype =
   match ty with
     | TPrimitive tp -> llvmprimitivetype2lltype tp ctxt      
     | TDerived td -> llvmderivedtype2lltype td tyst ctxt
-    | TName n -> llvmtype2lltype (Hashtbl.find tyst n) tyst ctxt
+    | TName n -> snd (Hashtbl.find tyst n)
     | TCste c -> c
 
 and llvmprimitivetype2lltype (ty: llvmprimitivetype) (ctxt: llcontext) : lltype =
