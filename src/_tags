@@ -1,5 +1,6 @@
 <lib>: include
 <core/calculus>: include
+<core/calculus2>: include
 <core/interp>: include
 <core/comp>: include
 <core/primitives>: include
