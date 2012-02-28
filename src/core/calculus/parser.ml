@@ -95,7 +95,7 @@ let parseassoc : associativity parsingrule =
 
 let parse_symbol_name_def : symbol parsingrule = 
   let symbols = ["\\+"; "\\*"; "\\["; "\\]";
-		 "@"; "-"; ":"; "|"; "\\&"; "="; "~"; "\\\\"; "/"; "<"; ">"
+		 "@"; "-"; ":"; "|"; "\\&"; "="; "~"; "\\\\"; "/"; "<"; ">"; ","
 		] in
   let format_symbols = String.concat "" ["\\("; 
 					 String.concat "\\|" symbols;
