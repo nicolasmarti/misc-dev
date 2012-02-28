@@ -28,7 +28,8 @@ type ('a, 'b) either = Left of 'a
 
 type llvmtype = TPrimitive of llvmprimitivetype
 		| TDerived of llvmderivedtype
-		| TCste of string
+		| TCste of lltype
+		| TName of string
 
 and llvmprimitivetype = TLabel
 			| TLabelPtr
@@ -49,7 +50,7 @@ and llvmaggregatetype = TArray of int * llvmtype
 			| TVector of int * (llvmintegertype, llvmfloatingtype) either
 			    
 and llvmderivedtype = TAggregate of llvmaggregatetype
-		      | TFunction of llvmtype array * llvmtype * bool
+		      | TFunction of (string * llvmtype) array * llvmtype * bool
 		      | TPointer of llvmtype
 
 
@@ -77,8 +78,47 @@ let pointer = fun ty -> TDerived (TPointer ty);;
 type typestore = (string, llvmtype) Hashtbl.t
 ;;
 
-let llvmtype2lltype (ty: llvmtype) (tyst: typestore) : lltype =
-  raise (Failure "llvmtype2lltype: not yet implemented")
+let rec llvmtype2lltype (ty: llvmtype) (tyst: typestore) (ctxt: llcontext) : lltype =
+  match ty with
+    | TPrimitive tp -> llvmprimitivetype2lltype tp ctxt      
+    | TDerived td -> llvmderivedtype2lltype td tyst ctxt
+    | TName n -> llvmtype2lltype (Hashtbl.find tyst n) tyst ctxt
+    | TCste c -> c
+
+and llvmprimitivetype2lltype (ty: llvmprimitivetype) (ctxt: llcontext) : lltype =
+  match ty with
+    | TLabel -> label_type ctxt
+    | TLabelPtr -> pointer_type (label_type ctxt)
+    | TIntegerType ti -> llvmintegertype2lltype ti ctxt
+    | TFloatingType tf -> llvmfloatingtype2lltype tf ctxt
+
+and llvmintegertype2lltype (ty: llvmintegertype) (ctxt: llcontext) : lltype =
+  match ty with
+    | TUInteger i | TSInteger i -> integer_type ctxt i
+
+and llvmfloatingtype2lltype (ty: llvmfloatingtype) (ctxt: llcontext) : lltype =
+  match ty with
+    | TFloat -> float_type ctxt
+    | TDouble -> double_type ctxt
+    | TQuad -> fp128_type ctxt
+
+and llvmderivedtype2lltype (ty: llvmderivedtype) (tyst: typestore) (ctxt: llcontext) : lltype =
+  match ty with
+    | TAggregate tag -> llvmaggregatetype2lltype tag tyst ctxt
+    | TFunction (args, retty, varargs) ->  
+      let retty = llvmtype2lltype retty tyst ctxt in
+      let args = Array.map (fun (_, ty) -> llvmtype2lltype ty tyst ctxt) args in
+      (if varargs then var_arg_function_type else function_type) retty args
+    | TPointer ty -> pointer_type (llvmtype2lltype ty tyst ctxt)
+
+and llvmaggregatetype2lltype (ty: llvmaggregatetype) (tyst: typestore) (ctxt: llcontext) : lltype =
+  match ty with
+    | TArray (i, ty) -> array_type (llvmtype2lltype ty tyst ctxt) i
+    | TStructure ls -> struct_type ctxt (Array.map (fun (_, ty) -> llvmtype2lltype ty tyst ctxt) ls)
+    | TPackedStructure ls -> packed_struct_type ctxt (Array.map (fun (_, ty) -> llvmtype2lltype ty tyst ctxt) ls)
+    | TVector (i, Left ti) -> vector_type (llvmintegertype2lltype ti ctxt) i
+    | TVector (i, Right tf) -> vector_type (llvmfloatingtype2lltype tf ctxt) i
+
 ;;
 
 (* *)
