@@ -121,6 +121,41 @@ and llvmaggregatetype2lltype (ty: llvmaggregatetype) (tyst: typestore) (ctxt: ll
 
 ;;
 
+let rec define_llvmtype (l: (string * llvmtype) array) (tyst: typestore) (ctxt: llcontext) : unit =
+  (* 
+     first we insert in the typestore the structured (the only possible recursive types)
+  *)
+  let () = Array.iter (fun (name, def) -> 
+      match def with
+	| TDerived (TAggregate (TStructure _)) | TDerived (TAggregate (TPackedStructure _)) ->
+	  let str = named_struct_type ctxt name in
+	  Hashtbl.add tyst name (def, str)
+	| _ -> ()
+  ) l in
+  (* then we compute all the types except the structures *)
+  let () = Array.iter (fun (name, def) -> 
+      match def with
+	| TDerived (TAggregate (TStructure _)) | TDerived (TAggregate (TPackedStructure _)) ->
+	  ()
+	| _ -> 
+	  let ty = llvmtype2lltype def tyst ctxt in
+	  Hashtbl.add tyst name (def, ty)
+  ) l in
+  (* finally we set the structure bodies *)
+  let () = Array.iter (fun (name, def) -> 
+      match def with
+	| TDerived (TAggregate (TStructure elts)) ->
+	  let structty = named_struct_type ctxt name in
+	  struct_set_body structty (Array.map (fun (_, ty) -> llvmtype2lltype ty tyst ctxt) elts) false
+	| TDerived (TAggregate (TPackedStructure elts)) ->
+	  let structty = named_struct_type ctxt name in
+	  struct_set_body structty (Array.map (fun (_, ty) -> llvmtype2lltype ty tyst ctxt) elts) true
+	| _ -> 
+	  ()
+  ) l in
+  ()
+  
+
 (* *)
 type llvmvalue = llvalue * llvmtype
 ;;
