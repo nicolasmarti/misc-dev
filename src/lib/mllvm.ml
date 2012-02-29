@@ -57,10 +57,11 @@ and llvmderivedtype = TAggregate of llvmaggregatetype
 (* some shortcut functions *)
 let uinteger = fun i -> TPrimitive (TIntegerType (TUInteger i));;
 let sinteger = fun i -> TPrimitive (TIntegerType (TSInteger i));;
-let double = TPrimitive (TFloatingType TDouble);;
-let float = TPrimitive (TFloatingType TFloat);;
+let double_ = TPrimitive (TFloatingType TDouble);;
+let float_ = TPrimitive (TFloatingType TFloat);;
 let quad = TPrimitive (TFloatingType TQuad);;
 let struct_ = fun tys -> TDerived (TAggregate (TStructure tys));;
+let pstruct_ = fun tys -> TDerived (TAggregate (TPackedStructure tys));;
 let array = fun ty sz -> TDerived (TAggregate (TArray (sz, ty)));;
 let vector = fun ty sz ->
   match ty with
@@ -82,11 +83,19 @@ let rec llvmtype2lltype (ty: llvmtype) (tyst: typestore) (ctxt: llcontext) : llt
   match ty with
     | TPrimitive tp -> llvmprimitivetype2lltype tp ctxt      
     | TDerived td -> llvmderivedtype2lltype td tyst ctxt
-    | TName n -> snd (Hashtbl.find tyst n)
+    | TName n -> snd 
+      (try 
+	 Hashtbl.find tyst n
+       with
+	 | e -> 
+	   printf "cannot find %s:\n" n; flush stdout;
+	   raise e
+      )
     | TCste c -> c
 
 and llvmprimitivetype2lltype (ty: llvmprimitivetype) (ctxt: llcontext) : lltype =
   match ty with
+    | TVoid -> void_type ctxt
     | TLabel -> label_type ctxt
     | TLabelPtr -> pointer_type (label_type ctxt)
     | TIntegerType ti -> llvmintegertype2lltype ti ctxt
@@ -128,10 +137,12 @@ let rec define_llvmtype (l: (string * llvmtype) array) (tyst: typestore) (ctxt: 
   let () = Array.iter (fun (name, def) -> 
       match def with
 	| TDerived (TAggregate (TStructure _)) | TDerived (TAggregate (TPackedStructure _)) ->
-	  let str = named_struct_type ctxt name in
-	  Hashtbl.add tyst name (def, str)
+	  let structty = named_struct_type ctxt name in
+	  printf "%s := %s\n" name (string_of_lltype structty); flush stdout;
+	  Hashtbl.add tyst name (def, structty)
 	| _ -> ()
   ) l in
+  printf "define_llvmtype (1)\n"; flush stdout;
   (* then we compute all the types except the structures *)
   let () = Array.iter (fun (name, def) -> 
       match def with
@@ -139,22 +150,26 @@ let rec define_llvmtype (l: (string * llvmtype) array) (tyst: typestore) (ctxt: 
 	  ()
 	| _ -> 
 	  let ty = llvmtype2lltype def tyst ctxt in
-	  Hashtbl.add tyst name (def, ty)
+	  printf "%s := %s\n" name (string_of_lltype ty); flush stdout
   ) l in
+  printf "define_llvmtype (2)\n"; flush stdout;
+
   (* finally we set the structure bodies *)
   let () = Array.iter (fun (name, def) -> 
       match def with
 	| TDerived (TAggregate (TStructure elts)) ->
-	  let structty = named_struct_type ctxt name in
+	  let structty = snd (Hashtbl.find tyst name) in
 	  struct_set_body structty (Array.map (fun (_, ty) -> llvmtype2lltype ty tyst ctxt) elts) false
+	  
 	| TDerived (TAggregate (TPackedStructure elts)) ->
-	  let structty = named_struct_type ctxt name in
+	  let structty = snd (Hashtbl.find tyst name) in
 	  struct_set_body structty (Array.map (fun (_, ty) -> llvmtype2lltype ty tyst ctxt) elts) true
 	| _ -> 
 	  ()
   ) l in
+  printf "define_llvmtype (3)\n"; flush stdout;
   ()
-  
+;;  
 
 (* *)
 type llvmvalue = llvalue * llvmtype
