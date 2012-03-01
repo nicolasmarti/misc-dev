@@ -13,15 +13,15 @@ open Hashtbl;;
 
 let tyst : typestore = Hashtbl.create 100;;
 
+let vst : valuestore = Hashtbl.create 100;;
+
 let slist_ty (elt: llvmtype) : (string * llvmtype) =
   "slist", struct_ [| ("elt", elt) ; ("next", pointer (TName "slist")) |];;
 
-let slist = TName "slist";;
+let _ = llvmdef_proceed (TypeDef [| slist_ty void |]) tyst vst modul;;
 
-let _ = define_llvmtype [| slist_ty void |] tyst context;;
+let _ = llvmdef_proceed (GlobalDef ("g_slist", Left (TName "slist"))) tyst vst modul;;
 
-let _ = define_global "test_list" (const_null (llvmtype2lltype slist tyst context)) modul;;
-
-let _ = printf "%s\n" (string_of_lltype (match type_by_name modul "slist" with | Some ty -> ty));;
+let _ = llvmdef_proceed (GlobalDef ("empty_slist", Right (null (TName "slist") tyst context)))  tyst vst modul;;
 
 let _ = dump_module modul;;

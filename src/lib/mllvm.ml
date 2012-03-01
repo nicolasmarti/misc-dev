@@ -172,9 +172,49 @@ let rec define_llvmtype (l: (string * llvmtype) array) (tyst: typestore) (ctxt: 
 ;;  
 
 (* *)
-type llvmvalue = llvalue * llvmtype
+type llvmvalue = llvalue * llvmtype;;
+
+let null (ty: llvmtype) (tyst: typestore) (ctxt: llcontext) : llvmvalue = (const_null (llvmtype2lltype ty tyst ctxt), ty) ;;
+
+(*
+Definitions
+*)
+type llvmdef = TypeDef of (string * llvmtype) array
+	       | SignatureDef of string * (string * llvmtype) array * llvmtype * bool
+	       | GlobalDef of string * (llvmtype, llvmvalue) either
 ;;
 
+type valuestore = (string, llvmvalue) Hashtbl.t;;
+
+(*
+val module_context : llmodule -> llcontext
+*)
+let llvmdef_proceed 
+    (def: llvmdef) 
+    (tyst: typestore) 
+    (vst: valuestore)
+    (modul: llmodule)
+    : unit =
+  match def with
+    | TypeDef typs -> 
+      define_llvmtype typs tyst (module_context modul)
+    | SignatureDef (n, args, retty, varargs) -> 
+      let fctty = function_ args retty varargs in
+      let ctxt = module_context modul in
+      let fct = declare_function n (llvmtype2lltype fctty tyst ctxt) modul in      
+      Hashtbl.add vst n (fct, fctty)
+    | GlobalDef (n, Left ty) ->
+      let ctxt = module_context modul in
+      let g = declare_global (llvmtype2lltype ty tyst ctxt) n modul in
+      Hashtbl.add vst n (g, ty);
+    | GlobalDef (n, Right (v, ty)) ->
+      let g = define_global n v modul in
+      Hashtbl.add vst n (g, ty)
+
+;;
+
+
+(*
 (* deep encoding of llvm expr, cmd, ... *)
 
 type blockname = string;;
@@ -224,13 +264,10 @@ and llvmexpr = UnaryOp of unaryop * llvmexpr
 	       | AdvancedOp of advancedop
 ;;
 
-type varstore = (string, llvmvalue) Hashtbl.t
-;;
-
 type blockstore = (string, llbasicblock) Hashtbl.t
 ;;
 
-let llvmexpr_semantics (builder: llbuilder) (tyst: typestore) (vst: varstore) (bst: blockstore) : unit =
+let llvmexpr_semantics (builder: llbuilder) (tyst: typestore) (vst: valuestore) (bst: blockstore) : unit =
   raise (Failure "llvmexpr_semantics: not yet implemented")
 ;;
 
@@ -264,24 +301,6 @@ type cmd = CAssign of llvmassign
 	   | Ift of cmd * cmd 
 	   | Loop of cmd * cmd * cmd * bool
 	   | Return of llvmexpr 
-
-(* directive *)
-type name = string;;
-
-
-(*
-'code can be 
-* llvmblock array
-* cmd
+;;
 
 *)
-type 'code llvmdirective = Type of (name * llvmtype) array
-			   | Signature of name * llvmtype
-			   | FunctionImplem of name * (name * llvmtype) array * 'code
-			   | GlobalVar of name * llvmtype * llvmexpr
-			   | GlobalCste of name * llvmtype * llvmexpr
-;;
-
-let llvmcmd_semantics (builder: llbuilder) (tyst: typestore) (vst: varstore) (bst: blockstore) : unit =
-  raise (Failure "llvmcmd_semantics: not yet implemented")
-;;
