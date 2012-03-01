@@ -23,7 +23,7 @@ let pass_manager = PassManager.create_function modul;;
 
 let target_data = ExecutionEngine.target_data engine;;
 
-printf "target_data := %s\n" (TargetData.as_string target_data);;
+(*printf "target_data := %s\n" (TargetData.as_string target_data);;*)
 
 TargetData.add target_data pass_manager;;
 

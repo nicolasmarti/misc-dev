@@ -24,4 +24,16 @@ let _ = llvmdef_proceed (GlobalDef ("g_slist", Left (TName "slist"))) tyst vst m
 
 let _ = llvmdef_proceed (GlobalDef ("empty_slist", Right (null (TName "slist") tyst context)))  tyst vst modul;;
 
+let _ = llvmdef_proceed 
+  (SignatureDef 
+     ("app_list", 
+      [| ("list1", TName "slist", [Attribute.Alignment 4]);
+	 ("list2", TName "slist", [Attribute.Alignment 4])
+      |],
+      (void, [Attribute.Noinline]),
+      false,
+      (Some 71)
+     )
+  ) tyst vst modul;;
+
 let _ = dump_module modul;;
