@@ -328,12 +328,7 @@ let llvmdef_proceed
 
 ;;
 
-
-(*
-(* deep encoding of llvm expr, cmd, ... *)
-
-type blockname = string;;
-
+(* llvm expression *)
 type unaryop = Not;;
 
 type binaryop = Add | Sub | Mul | Div | Rem
@@ -378,6 +373,28 @@ and llvmexpr = UnaryOp of unaryop * llvmexpr
 
 	       | AdvancedOp of advancedop
 ;;
+
+let llvmexpr_cste (e: llvmexpr) (tyst: typestore) (vst: valuestore) : llvmvalue =
+  match e with
+    | Var v -> 
+      (try 
+	 Hashtbl.find vst v
+       with
+	| e -> 
+	   printf "cannot find %s:\n" v; flush stdout;
+	   raise e
+      )
+    | Cste v -> v
+    | _-> raise Exit
+;;
+
+
+
+(*
+(* deep encoding of llvm expr, cmd, ... *)
+
+type blockname = string;;
+
 
 type blockstore = (string, llbasicblock) Hashtbl.t
 ;;
