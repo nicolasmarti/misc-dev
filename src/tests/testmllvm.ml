@@ -36,6 +36,4 @@ let _ = llvmdef_proceed
      )
   ) tyst vst modul;;
 
-let _ = llvmexpr_cste (Var "empty_slist") tyst vst;;
-
 let _ = dump_module modul;;

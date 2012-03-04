@@ -130,6 +130,19 @@ and llvmaggregatetype2lltype (ty: llvmaggregatetype) (tyst: typestore) (ctxt: ll
 
 ;;
 
+let rec type_unification (t1: llvmtype) (t2: llvmtype) (tyst: typestore): typestore option =
+  None
+;;
+
+let rec func_retty ty tyst =
+  match ty with
+    | TName n ->       
+      func_retty (fst (Hashtbl.find tyst n)) tyst
+    | TDerived (TFunction (args, retty, vararg)) ->
+      retty
+    | _ -> raise (Failure "func_retty")
+;;
+
 let rec define_llvmtype (l: (string * llvmtype) array) (tyst: typestore) (ctxt: llcontext) : unit =
   (* 
      first we insert in the typestore the structured (the only possible recursive types)
@@ -374,7 +387,12 @@ and llvmexpr = UnaryOp of unaryop * llvmexpr
 	       | AdvancedOp of advancedop
 ;;
 
-let llvmexpr_cste (e: llvmexpr) (tyst: typestore) (vst: valuestore) : llvmvalue =
+let builder2context builder =
+module_context (global_parent (block_parent (insertion_block builder)))
+;;
+
+
+let rec llvmexpr_eval (e: llvmexpr) (tyst: typestore) (vst: valuestore) (builder: llbuilder) : llvmvalue =
   match e with
     | Var v -> 
       (try 
@@ -385,8 +403,46 @@ let llvmexpr_cste (e: llvmexpr) (tyst: typestore) (vst: valuestore) : llvmvalue 
 	   raise e
       )
     | Cste v -> v
+    | UnaryOp (op, e) -> llvmexpr_unaryop_eval op e tyst vst builder
+    | BinaryOp (op, e1, e2) -> llvmexpr_binaryop_eval op e1 e2 tyst vst builder
+    | Memaccessop op -> llvmexpr_memaccess_eval op tyst vst builder
+    | Convop op -> llvmexpr_conv_eval op tyst vst builder
+    | True -> let ty = uinteger 1 in 
+	      (const_all_ones (llvmtype2lltype ty tyst (builder2context builder)), ty)
+    | False -> let ty = uinteger 1 in 
+	      (const_null (llvmtype2lltype ty tyst (builder2context builder)), ty)
+    | Compop (op, e1, e2) -> llvmexpr_compop_eval op e1 e2 tyst vst builder
+    | Call (f, args) ->
+      let (f, fty) = llvmexpr_eval f tyst vst builder in
+      let args = Array.map (fun e -> fst (llvmexpr_eval e tyst vst builder)) args in
+      let call = build_call f args "call" builder in
+      (call, func_retty fty tyst)
+    | Select (c, e1, e2) ->
+      let (vc, tc) = llvmexpr_eval c tyst vst builder in
+      let (v1, t1) = llvmexpr_eval e1 tyst vst builder in
+      let (v2, t2) = llvmexpr_eval e2 tyst vst builder in
+      (build_select vc v1 v2 "select" builder, t1)
+    | AdvancedOp op -> llvmexpr_advancedop_eval op tyst vst builder
+and llvmexpr_unaryop_eval (op: unaryop) (e: llvmexpr) (tyst: typestore) (vst: valuestore) (builder: llbuilder) : llvmvalue =
+  match op with
+    | _-> raise Exit
+and llvmexpr_binaryop_eval (op: binaryop) (e1: llvmexpr) (e2: llvmexpr) (tyst: typestore) (vst: valuestore) (builder: llbuilder) : llvmvalue =
+  match op with
+    | _-> raise Exit
+and llvmexpr_memaccess_eval (op: memaccessop) (tyst: typestore) (vst: valuestore) (builder: llbuilder) : llvmvalue =
+  match op with
+    | _-> raise Exit
+and llvmexpr_conv_eval (op: convop) (tyst: typestore) (vst: valuestore) (builder: llbuilder) : llvmvalue =
+  match op with
+    | _-> raise Exit
+and llvmexpr_compop_eval (op: compop) (e1: llvmexpr) (e2: llvmexpr) (tyst: typestore) (vst: valuestore) (builder: llbuilder) : llvmvalue =
+  match op with
+    | _-> raise Exit
+and llvmexpr_advancedop_eval (op: advancedop) (tyst: typestore) (vst: valuestore) (builder: llbuilder) : llvmvalue =
+  match op with
     | _-> raise Exit
 ;;
+
 
 
 
