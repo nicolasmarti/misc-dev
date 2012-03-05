@@ -143,6 +143,31 @@ let rec func_retty ty tyst =
     | _ -> raise (Failure "func_retty")
 ;;
 
+let rec numerical_ty ty tyst =
+  match ty with
+    | TName n ->       
+      numerical_ty (fst (Hashtbl.find tyst n)) tyst
+    | TPrimitive (TIntegerType (TUInteger i)) -> `Uinteger i
+    | TPrimitive (TIntegerType (TSInteger i)) -> `Sinteger i
+    | TPrimitive (TFloatingType (TFloat)) -> `Float
+    | TPrimitive (TFloatingType (TDouble)) -> `Double
+    | TPrimitive (TFloatingType (TQuad)) -> `Quad
+
+    | TDerived (TAggregate (TVector (_, Left ty))) -> numerical_ty (TPrimitive (TIntegerType ty)) tyst
+    | TDerived (TAggregate (TVector (_, Right ty))) -> numerical_ty (TPrimitive (TFloatingType ty)) tyst
+
+    | _ -> raise (Failure "numerical_ty")
+;;
+
+let rec size_ty ty tyst =
+  match ty with
+    | TName n ->       
+      size_ty (fst (Hashtbl.find tyst n)) tyst
+    | TDerived (TAggregate (TVector (i, _))) -> i
+    | TDerived (TAggregate (TArray (i, _))) -> i
+    | _ -> 1
+;;
+
 let rec define_llvmtype (l: (string * llvmtype) array) (tyst: typestore) (ctxt: llcontext) : unit =
   (* 
      first we insert in the typestore the structured (the only possible recursive types)
@@ -345,7 +370,7 @@ let llvmdef_proceed
 type unaryop = Not;;
 
 type binaryop = Add | Sub | Mul | Div | Rem
-		| Shl | LShl | AShl | And | Or | Xor;;
+		| Shl | LShr | AShr | And | Or | Xor;;
 
 type compop = Eq | Ne | Lt | Gt | Le | Ge;;
 
@@ -423,12 +448,107 @@ let rec llvmexpr_eval (e: llvmexpr) (tyst: typestore) (vst: valuestore) (builder
       let (v2, t2) = llvmexpr_eval e2 tyst vst builder in
       (build_select vc v1 v2 "select" builder, t1)
     | AdvancedOp op -> llvmexpr_advancedop_eval op tyst vst builder
-and llvmexpr_unaryop_eval (op: unaryop) (e: llvmexpr) (tyst: typestore) (vst: valuestore) (builder: llbuilder) : llvmvalue =
+and llvmexpr_unaryop_eval (op: unaryop) (e1: llvmexpr) (tyst: typestore) (vst: valuestore) (builder: llbuilder) : llvmvalue =
   match op with
-    | _-> raise Exit
+    | Not -> let (v1, t1) = llvmexpr_eval e1 tyst vst builder in
+	     match numerical_ty t1 tyst with
+	       | `Float | `Double | `Quad -> (build_fneg v1 "not" builder, t1)
+	       | `Uinteger _ -> (build_not v1 "not" builder, t1)
+	       | `Sinteger _ -> (build_neg v1 "not" builder, t1)
 and llvmexpr_binaryop_eval (op: binaryop) (e1: llvmexpr) (e2: llvmexpr) (tyst: typestore) (vst: valuestore) (builder: llbuilder) : llvmvalue =
+  let (v1, t1) = llvmexpr_eval e1 tyst vst builder in
+  let (v2, t2) = llvmexpr_eval e2 tyst vst builder in
   match op with
-    | _-> raise Exit
+    | Add -> (
+      let nt1 = numerical_ty t1 tyst in
+      assert (nt1 = numerical_ty t2 tyst);
+      assert (size_ty t1 tyst = size_ty t2 tyst);
+      match nt1 with
+	| `Uinteger _ | `Sinteger _ -> (build_add v1 v2 "add" builder, t1)
+	| `Float | `Double | `Quad -> (build_fadd v1 v2 "add" builder, t1)      
+    )
+    | Sub -> (
+      let nt1 = numerical_ty t1 tyst in
+      assert (nt1 = numerical_ty t2 tyst);
+      assert (size_ty t1 tyst = size_ty t2 tyst);
+      match nt1 with
+	| `Uinteger _ | `Sinteger _ -> (build_sub v1 v2 "sub" builder, t1)
+	| `Float | `Double | `Quad -> (build_fsub v1 v2 "sub" builder, t1)      
+    )
+    | Mul -> (
+      let nt1 = numerical_ty t1 tyst in
+      assert (nt1 = numerical_ty t2 tyst);
+      assert (size_ty t1 tyst = size_ty t2 tyst);
+      match nt1 with
+	| `Uinteger _ | `Sinteger _ -> (build_mul v1 v2 "mul" builder, t1)
+	| `Float | `Double | `Quad -> (build_fmul v1 v2 "mul" builder, t1)      
+    )
+    | Div -> (
+      let nt1 = numerical_ty t1 tyst in
+      assert (nt1 = numerical_ty t2 tyst);
+      assert (size_ty t1 tyst = size_ty t2 tyst);
+      match nt1 with
+	| `Uinteger _ -> (build_udiv v1 v2 "div" builder, t1)
+	| `Sinteger _ -> (build_sdiv v1 v2 "div" builder, t1)
+	| `Float | `Double | `Quad -> (build_fdiv v1 v2 "div" builder, t1)      
+    )
+    | Rem -> (
+      let nt1 = numerical_ty t1 tyst in
+      assert (nt1 = numerical_ty t2 tyst);
+      assert (size_ty t1 tyst = size_ty t2 tyst);
+      match nt1 with
+	| `Uinteger _ -> (build_urem v1 v2 "rem" builder, t1)
+	| `Sinteger _ -> (build_srem v1 v2 "rem" builder, t1)
+	| `Float | `Double | `Quad -> (build_frem v1 v2 "rem" builder, t1)      
+    )
+    | Shl -> (
+      let nt1 = numerical_ty t1 tyst in
+      let nt2 = numerical_ty t2 tyst in
+      assert (size_ty t2 tyst = 1);
+      match nt1, nt2 with
+	| `Uinteger _, `Uinteger _ -> (build_shl v1 v2 "shl" builder, t1)
+	| _ -> raise (Failure "eval(Shl): op1 and/or op2 not an uint")
+    )
+    | LShr -> (
+      let nt1 = numerical_ty t1 tyst in
+      let nt2 = numerical_ty t2 tyst in
+      assert (size_ty t2 tyst = 1);
+      match nt1, nt2 with
+	| `Uinteger _, `Uinteger _ -> (build_lshr v1 v2 "lshr" builder, t1)
+	| _ -> raise (Failure "eval(LShr): op1 and/or op2 not an uint")
+    )
+    | AShr -> (
+      let nt1 = numerical_ty t1 tyst in
+      let nt2 = numerical_ty t2 tyst in
+      assert (size_ty t2 tyst = 1);
+      match nt1, nt2 with
+	| `Uinteger _, `Uinteger _ -> (build_ashr v1 v2 "ashr" builder, t1)
+	| _ -> raise (Failure "eval(AShr): op1 and/or op2 not an uint")
+    )
+    | And -> (
+      let nt1 = numerical_ty t1 tyst in
+      assert (nt1 = numerical_ty t2 tyst);
+      assert (size_ty t1 tyst = size_ty t2 tyst);
+      match nt1 with
+	| `Uinteger _ -> (build_and v1 v2 "and" builder, t1)
+	| _ -> raise (Failure "eval(And): op1 and/or op2 not an uint")
+    )
+    | Or -> (
+      let nt1 = numerical_ty t1 tyst in
+      assert (nt1 = numerical_ty t2 tyst);
+      assert (size_ty t1 tyst = size_ty t2 tyst);
+      match nt1 with
+	| `Uinteger _ -> (build_or v1 v2 "or" builder, t1)
+	| _ -> raise (Failure "eval(or): op1 and/or op2 not an uint")
+    )
+    | Xor -> (
+      let nt1 = numerical_ty t1 tyst in
+      assert (nt1 = numerical_ty t2 tyst);
+      assert (size_ty t1 tyst = size_ty t2 tyst);
+      match nt1 with
+	| `Uinteger _ -> (build_xor v1 v2 "xor" builder, t1)
+	| _ -> raise (Failure "eval(xor): op1 and/or op2 not an uint")
+    )
 and llvmexpr_memaccess_eval (op: memaccessop) (tyst: typestore) (vst: valuestore) (builder: llbuilder) : llvmvalue =
   match op with
     | _-> raise Exit
