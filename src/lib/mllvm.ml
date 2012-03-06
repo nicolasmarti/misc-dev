@@ -47,6 +47,7 @@ and llvmfloatingtype = TFloat
 and llvmaggregatetype = TArray of int * llvmtype
 			| TStructure of (string * llvmtype) array
 			| TPackedStructure of (string * llvmtype) array
+			(* the vector can have pointers of integer/floating types *)
 			| TVector of int * (llvmintegertype, llvmfloatingtype) either
 			    
 and llvmderivedtype = TAggregate of llvmaggregatetype
@@ -603,6 +604,16 @@ and llvmexpr_memaccess_eval (op: memaccessop) (tyst: typestore) (vst: valuestore
       (build_gep v1 (Array.map fst indices) "gep" builder, pointer t)
 and llvmexpr_conv_eval (op: convop) (tyst: typestore) (vst: valuestore) (builder: llbuilder) : llvmvalue =
   match op with
+    | I2Ptr (e1, t) ->
+      let (v1, t1) = llvmexpr_eval e1 tyst vst builder in
+      assert (uint_ty t1 tyst);
+      let _ = pointer_ty t tyst in
+      (build_inttoptr v1 (llvmtype2lltype t tyst (builder2context builder)) "ItoPtr" builder, t)
+    | Ptr2I (e1, t) ->
+      let (v1, t1) = llvmexpr_eval e1 tyst vst builder in
+      assert (uint_ty t tyst);
+      let _ = pointer_ty t1 tyst in
+      (build_ptrtoint v1 (llvmtype2lltype t tyst (builder2context builder)) "PtrtoInt" builder, t)
     | _-> raise Exit
 and llvmexpr_compop_eval (op: compop) (e1: llvmexpr) (e2: llvmexpr) (tyst: typestore) (vst: valuestore) (builder: llbuilder) : llvmvalue =
   match op with
