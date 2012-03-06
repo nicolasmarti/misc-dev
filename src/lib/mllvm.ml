@@ -134,19 +134,23 @@ let rec type_unification (t1: llvmtype) (t2: llvmtype) (tyst: typestore): typest
   None
 ;;
 
-let rec func_retty ty tyst =
+let rec hnf_ty ty tyst =
   match ty with
     | TName n ->       
-      func_retty (fst (Hashtbl.find tyst n)) tyst
+      hnf_ty (fst (Hashtbl.find tyst n)) tyst
+    | _ -> ty
+;;
+  
+
+let rec func_retty ty tyst =
+  match hnf_ty ty tyst with
     | TDerived (TFunction (args, retty, vararg)) ->
       retty
     | _ -> raise (Failure "func_retty")
 ;;
 
 let rec numerical_ty ty tyst =
-  match ty with
-    | TName n ->       
-      numerical_ty (fst (Hashtbl.find tyst n)) tyst
+  match hnf_ty ty tyst with
     | TPrimitive (TIntegerType (TUInteger i)) -> `Uinteger i
     | TPrimitive (TIntegerType (TSInteger i)) -> `Sinteger i
     | TPrimitive (TFloatingType (TFloat)) -> `Float
@@ -159,14 +163,44 @@ let rec numerical_ty ty tyst =
     | _ -> raise (Failure "numerical_ty")
 ;;
 
+let rec uint_ty ty tyst =
+  match hnf_ty ty tyst with
+    | TPrimitive (TIntegerType (TUInteger i)) -> true
+    | _ -> false
+;;
+
+
 let rec size_ty ty tyst =
-  match ty with
-    | TName n ->       
-      size_ty (fst (Hashtbl.find tyst n)) tyst
+  match hnf_ty ty tyst with
     | TDerived (TAggregate (TVector (i, _))) -> i
     | TDerived (TAggregate (TArray (i, _))) -> i
     | _ -> 1
 ;;
+
+let rec pointer_ty ty tyst =
+  match hnf_ty ty tyst with
+    | TDerived (TPointer ty) -> ty
+    | _ -> raise (Failure "pointer_ty")
+;;
+
+let rec pointer_deepness_ty ty indices tyst =
+  match indices with
+    | [] -> ty
+    | (v, t)::tl ->
+      assert(uint_ty t tyst);
+      match hnf_ty ty tyst with
+	| TDerived (TPointer ty) -> pointer_deepness_ty ty tl tyst
+	| TDerived (TAggregate (TVector (i, Left ty))) -> pointer_deepness_ty (TPrimitive (TIntegerType ty)) tl tyst
+	| TDerived (TAggregate (TVector (i, Right ty))) -> pointer_deepness_ty (TPrimitive (TFloatingType ty)) tl tyst
+	| TDerived (TAggregate (TArray (i, ty))) -> pointer_deepness_ty ty tl tyst
+	| TDerived (TAggregate (TStructure tys)) | TDerived (TAggregate (TPackedStructure tys)) -> (
+	  match int64_of_const v with
+	    | None -> raise (Failure "pointer_deepness_ty")
+	    | Some i -> pointer_deepness_ty (snd tys.(Int64.to_int i)) tl tyst
+	)
+	| _ -> raise (Failure "pointer_deepness_ty")
+;;
+
 
 let rec define_llvmtype (l: (string * llvmtype) array) (tyst: typestore) (ctxt: llcontext) : unit =
   (* 
@@ -551,7 +585,22 @@ and llvmexpr_binaryop_eval (op: binaryop) (e1: llvmexpr) (e2: llvmexpr) (tyst: t
     )
 and llvmexpr_memaccess_eval (op: memaccessop) (tyst: typestore) (vst: valuestore) (builder: llbuilder) : llvmvalue =
   match op with
-    | _-> raise Exit
+    | Alloca (ty, None) -> (build_alloca (llvmtype2lltype ty tyst (builder2context builder)) "alloca" builder, pointer ty)
+    | Alloca (ty, Some e) -> (
+      let (v, t) = llvmexpr_eval e tyst vst builder in
+      assert (size_ty t tyst = 1);
+      match numerical_ty t tyst with
+	| `Uinteter _ -> (build_array_alloca (llvmtype2lltype ty tyst (builder2context builder)) v "alloca" builder, pointer ty)
+	| _ -> raise (Failure "eval(alloca): size not an uint")
+    )
+    | Load e -> let (v, t) = llvmexpr_eval e tyst vst builder in
+		let t' = pointer_ty t tyst in
+		(build_load v "load" builder, t')
+    | Getelementptr (e1, indices) ->
+      let (v1, t1) = llvmexpr_eval e1 tyst vst builder in
+      let indices = Array.map (fun hd -> llvmexpr_eval hd tyst vst builder) indices in
+      let t = pointer_deepness_ty t1 (Array.to_list indices) tyst in
+      (build_gep v1 (Array.map fst indices) "gep" builder, pointer t)
 and llvmexpr_conv_eval (op: convop) (tyst: typestore) (vst: valuestore) (builder: llbuilder) : llvmvalue =
   match op with
     | _-> raise Exit
