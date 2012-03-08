@@ -201,6 +201,25 @@ void* get_root_bitmap_ptr(void* segment, uint nb_bulk)
   return (segment + (4 + bitmap_size_elt(nb_bulk))*ptr_size_byte);
 }
 
+// from the starting address of a bitmap (given a nb_bulk), return the address of the level l bitmap
+void* get_level_l_bitmap_ptr(void* bitmap_ptr, uint nb_bulk, uint level){
+  
+  uint offset = 0;
+  uint curr_level = 0;
+  uint curr_level_size = floor_div(nb_bulk, ptr_size_bit);
+
+  for (; curr_level_size < level; 
+       ++curr_level, 
+	 curr_level_size = floor_div(curr_level_size, ptr_size_bit))
+    {
+      offset += curr_level_size;  
+    }
+  
+  //printf("sizeof(bitmap[%lu]) := 1 (<= %lu)\n", curr_level+1, ptr_size_bit);
+
+  return bitmap_ptr + offset*ptr_size_byte; 
+
+}
 
 
 // clear counter and alloc bitmap of a segment 
@@ -290,6 +309,57 @@ void* take_segment_start(void** start, void** end)
   return res;
 }
 
+//***************************************************************
+// bit pointers
+typedef uint bm_index;
+typedef uint bm_mask;
+typedef uint bm_level;
+
+//increment a bitpointer
+void inc_bitptr(bm_index* index, bm_mask* mask)
+{
+  // we shift the mask
+  *mask <<= 1;
+
+  // if it becomes 0 then we increase the index and reset the mask
+  if (*mask == 0)
+    {
+      ++(*index);
+      *mask = 1;
+    }
+
+  return;
+}
+
+//convert a bit index to a bit pointer
+void indexToBitPtr(bm_index i, bm_index* index, bm_mask* mask)
+{
+  *index = i / ptr_size_bit;
+  *mask = 1 << (i % ptr_size_bit);
+}
+
+//convert a bitptr to a bit index
+bm_index bitPtrToIndex(bm_index index, bm_mask mask)
+{
+  return index * ptr_size_bit + (floor_log2(mask) - 1);
+}
+
+// convert a bitptr to a bulk address
+void* blockAddress(void* data_ptr, bm_index index, bm_mask mask, uint bulk_size){
+
+  return data_ptr + bitPtrToIndex(index, mask)*bulk_size*ptr_size_byte;
+
+}
+
+// test if the bitptr for level i is set or not
+uint isMarked(void* bitmap_ptr, bm_index index, bm_mask mask, uint level, uint nb_bulk)
+{
+  void* bitmap = get_level_l_bitmap_ptr(bitmap_ptr, nb_bulk, level);
+  return mask & *(uint*)(bitmap + index*ptr_size_byte);
+
+}
+
+//***************************************************************
 
 // allocate a new segment
 void* alloc_segment(uint nb_bulk){
@@ -328,6 +398,12 @@ void* alloc_segment(uint nb_bulk){
 /***********************************************************************************************/
 
 char gc_init(uint n){
+
+  if(sizeof(void*) != sizeof(uint)) {
+    //we assert that it is a proper power of two
+    printf("catasrophic: uint and void* are of different size !!!");
+    return 0;
+  }
 
   segment_size_n = n;
 
