@@ -40,15 +40,19 @@ uint floor_div(uint x, uint y){
 
 }
 
-uint ptr_size_bit_pow2(){
+uint ptr_size_bit_pow2;
 
-  uint res = floor_log2(ptr_size_bit);
-  if(ptr_size_bit != (uint)(1) << res)
-    //we assert that it is a proper power of two
-    printf("catasrophic: ptr_size_bit is not a power of 2: %lu != 1 << %lu == %lu\n", ptr_size_bit, res, (uint)(1) << res);
-  return res;
+uint floor_div_ptr_size_bit(uint x)
+{
+  uint y = x >> ptr_size_bit_pow2;
+  
+  if (x > y << ptr_size_bit_pow2)
+    ++y;
 
+  return y;
+ 
 }
+
 
 /***********************************************************************************************/
 // the segment are defined as an array of 2^n void* and align on 2^n
@@ -105,9 +109,12 @@ uint bitmap_size_elt(uint nb_bulk)
 {
   uint size = 0;
   uint curr_level = 0;
-  uint curr_level_size = floor_div(nb_bulk, ptr_size_bit);
+  uint curr_level_size = floor_div_ptr_size_bit(nb_bulk);
 
-  for (; curr_level_size > 1; ++curr_level, curr_level_size = floor_div(curr_level_size, ptr_size_bit))
+  for (; curr_level_size > 1; 
+       ++curr_level, 
+	 curr_level_size = floor_div_ptr_size_bit(curr_level_size)
+       )
     {
       //printf("sizeof(bitmap[%lu]) := %lu (<= %lu)\n", curr_level, curr_level_size, curr_level_size * ptr_size_bit);
       size += curr_level_size;  
@@ -206,11 +213,11 @@ void* get_level_l_bitmap_ptr(void* bitmap_ptr, uint nb_bulk, uint level){
   
   uint offset = 0;
   uint curr_level = 0;
-  uint curr_level_size = floor_div(nb_bulk, ptr_size_bit);
+  uint curr_level_size = floor_div_ptr_size_bit(nb_bulk);
 
   for (; curr_level_size < level; 
        ++curr_level, 
-	 curr_level_size = floor_div(curr_level_size, ptr_size_bit))
+	 curr_level_size = floor_div_ptr_size_bit(curr_level_size))
     {
       offset += curr_level_size;  
     }
@@ -399,15 +406,24 @@ void* alloc_segment(uint nb_bulk){
 
 char gc_init(uint n){
 
+  ptr_size_bit_pow2 = floor_log2(ptr_size_bit);
+
   if(sizeof(void*) != sizeof(uint)) {
     //we assert that it is a proper power of two
     printf("catasrophic: uint and void* are of different size !!!");
     return 0;
   }
 
+  if(ptr_size_bit != (uint)(1) << ptr_size_bit_pow2) {
+    //we assert that it is a proper power of two
+    printf("catasrophic: ptr_size_bit is not a power of 2: %lu != 1 << %lu == %lu\n", ptr_size_bit, ptr_size_bit_pow2, (uint)(1) << ptr_size_bit_pow2);
+    return 0;
+  }
+
+
   segment_size_n = n;
 
-  printf("sizeof(void*) = 2^%lu\n", ptr_size_bit_pow2());
+  printf("sizeof(void*) = 2^%lu\n", ptr_size_bit_pow2);
 
   uint bulk_size = 3;
 
@@ -443,6 +459,14 @@ char gc_init(uint n){
 
   printf("(%p, %p)\n", min_segment_start, max_segment_end);
 
+  
+  uint i;
+  for (i = 0; i < 10000; ++i)
+    {
+      if (floor_div(i, ptr_size_bit) != floor_div_ptr_size_bit(i))
+	printf("%lu != %lu\n", floor_div(i, ptr_size_bit), floor_div_ptr_size_bit(i));
+	
+    }
   return -1;
 }
 
