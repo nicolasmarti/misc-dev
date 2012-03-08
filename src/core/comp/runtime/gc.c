@@ -85,8 +85,8 @@ void* magic_number;
   
  */
 
-
-uint bitmap_size(uint nb_bulk)
+// bitmap_size in pointer
+uint bitmap_size_elt(uint nb_bulk)
 {
   uint size = 0;
   uint curr_level = 0;
@@ -94,11 +94,11 @@ uint bitmap_size(uint nb_bulk)
 
   for (; curr_level_size > 1; ++curr_level, curr_level_size = floor_div(curr_level_size, ptr_size_bit))
     {
-      printf("sizeof(bitmap[%lu]) := %lu (<= %lu)\n", curr_level, curr_level_size, curr_level_size * ptr_size_bit);
+      //printf("sizeof(bitmap[%lu]) := %lu (<= %lu)\n", curr_level, curr_level_size, curr_level_size * ptr_size_bit);
       size += curr_level_size;  
     }
   
-  printf("sizeof(bitmap[%lu]) := 1 (<= %lu)\n", curr_level+1, ptr_size_bit);
+  //printf("sizeof(bitmap[%lu]) := 1 (<= %lu)\n", curr_level+1, ptr_size_bit);
 
   return ++size;
 }
@@ -110,10 +110,26 @@ uint segment_size(uint nb_bulk, uint bulk_size)
 	  1 + // magic
 	  2 + // next/prev
 	  1 + // counter
-	  bitmap_size(nb_bulk) + //bitmap
+	  bitmap_size_elt(nb_bulk) + //bitmap
 	  (nb_bulk * bulk_size) + // data
 	  nb_bulk // stack
-	  ) * sizeof(void*);
+	  ) * ptr_size_byte;
+
+}
+
+// compute the nb_bulk max for a segment of max_size byte with bulk of bulk_size
+uint nb_bulk_ub(uint max_size, uint bulk_size)
+{
+  // a first guess
+  uint res = floor_div(max_size, bulk_size*ptr_size_byte);
+
+  printf("init guess := %lu\n", res);
+  
+  // then we iterate to find the max number of bulk
+  while (segment_size(res, bulk_size) > max_size)
+    --res;
+
+  return res;
 
 }
 
@@ -123,10 +139,19 @@ char gc_init(uint n){
 
   printf("sizeof(void*) = 2^%lu\n", ptr_size_bit_pow2());
 
-  uint nb_bulk = 200;
-  uint bulk_size = 3;
+  uint bulk_size = 300;
 
-  printf("sizeof(segment(%lu, %lu)) = %lu bytes\n", nb_bulk, bulk_size, segment_size(nb_bulk, bulk_size));
+  uint segment_size_ub = 1 << segment_size_n;
+
+  uint nb_bulk = nb_bulk_ub(segment_size_ub, bulk_size);
+
+  printf("segment_size == %lu (>= %lu) /\\ bulk_size == %lu (sizeof == %lu) -> nb_bulk == %lu\n", 
+	 segment_size_ub,
+	 segment_size(nb_bulk, bulk_size),	 
+	 bulk_size, 
+	 bulk_size * ptr_size_byte, 
+	 nb_bulk
+	 );
 
   return -1;
 }
