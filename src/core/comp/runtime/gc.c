@@ -1,4 +1,6 @@
-#include<stdio.h>
+#include<stdio.h> //printf
+#include<malloc.h> //memalign
+#include<string.h> //memset
 /*
 
    this is a memeory allocator / garbage collector
@@ -48,6 +50,7 @@ uint ptr_size_bit_pow2(){
 
 }
 
+/***********************************************************************************************/
 // the segment are defined as an array of 2^n void* and align on 2^n
 // this allow to optimize the computation of a segment address from a chunk address
 uint segment_size_n;
@@ -75,6 +78,10 @@ void* magic_number;
     Thus we can compute statically the max level L as L := floor(log_{ptr_size_bit}(nb_bulk))
     BM[i](j) is the j-th bit of BM[i]
     BM[i][j] is the j-th element of BM[i]
+
+    this bitmap is used to store the information about allocated blocks
+
+  - a bitmap similar to the previous one, keeping the root information
 
   - an array of void* of size nb_bulk*bulk_size
 
@@ -110,7 +117,8 @@ uint segment_size(uint nb_bulk, uint bulk_size)
 	  1 + // magic
 	  2 + // next/prev
 	  1 + // counter
-	  bitmap_size_elt(nb_bulk) + //bitmap
+	  bitmap_size_elt(nb_bulk) + //bitmap for allocated bits
+	  bitmap_size_elt(nb_bulk) + //bitmap for root bits
 	  (nb_bulk * bulk_size) + // data
 	  nb_bulk // stack
 	  ) * ptr_size_byte;
@@ -133,13 +141,119 @@ uint nb_bulk_ub(uint max_size, uint bulk_size)
 
 }
 
+// in order to check if a pointer is in a segment that we allocated we keep the min of all segment starting address, and the max of all segment last address
+void* min_segment_start = (void*)(-1);
+void* max_segment_end = (void*)(0);
+
+// lookup the magic_number
+void* get_magic_number (void* segment){
+  return *(void**)(segment);
+}
+
+// mutate the magic_number
+void set_magic_number (void* segment, void* magic){
+  *(void**)(segment) = magic;
+}
+
+// lookup the previous segment pointer
+void* get_segment_prev(void* segment){
+  return *(void**)(segment + 1);
+}
+
+// lookup the next segment pointer
+void* get_segment_next(void* segment){
+  return *(void**)(segment + 2);
+}
+
+// mutate the previous segment pointer
+void set_segment_prev(void* segment, void* prev){
+  *(void**)(segment + 1) = prev;
+}
+
+// mutate the next segment pointer
+void set_segment_next(void* segment, void* next){
+  *(void**)(segment + 2) = next;
+}
+
+// lookup the counter
+uint get_segment_counter(void* segment){
+  return *(uint*)(segment + 3);
+}
+
+//mutate the counter
+void set_segment_counter(void* segment, uint counter){
+  *(uint*)(segment + 3) = counter;
+}
+
+// get pointer to the alloc bitmap
+void* get_alloc_bitmap_ptr(void* segment)
+{
+  return (segment + 4);
+}
+
+// get pointer to the root bitmap
+void* get_root_bitmap_ptr(void* segment, uint nb_bulk)
+{
+  return (segment + 4 + bitmap_size_elt(nb_bulk));
+}
+
+
+
+// clear counter and alloc bitmap of a segment 
+void clearABMandCount(void* segment, uint nb_bulk)
+{
+  memset(segment + 3, // counter is at offset 3
+	 0, // we put zeros
+	 (1+bitmap_size_elt(nb_bulk))*ptr_size_byte // on an array of void* of the size of the bitmap + counter
+	 );
+}
+
+// clear counter and alloc&root bitmap of a segment 
+void clearARBMandCount(void* segment, uint nb_bulk)
+{
+  memset(segment + 3, // counter is at offset 3
+	 0, // we put zeros
+	 (1+2*bitmap_size_elt(nb_bulk))*ptr_size_byte // on an array of void* of the size of the bitmap + counter
+	 );
+}
+
+
+// allocate a new segment
+void* alloc_segment(uint nb_bulk){
+
+  // compute the desired size (which is also the alignment
+  uint segment_size_ub = 1 << segment_size_n;
+
+  // allocate
+  void* segment = memalign(segment_size_ub, segment_size_ub);
+  
+  // update boundaries for segments address
+  if (min_segment_start > segment) 
+    min_segment_start = segment;
+
+  if (max_segment_end < (segment + segment_size_ub)) 
+    max_segment_end = (segment + segment_size_ub);
+
+  // update the magic number
+  set_magic_number(segment, magic_number);
+
+  // clear counter and alloc/root bitmap
+  clearARBMandCount(segment, nb_bulk);
+
+  return segment;
+}
+
+
+
+/***********************************************************************************************/
+
 char gc_init(uint n){
 
   segment_size_n = n;
 
   printf("sizeof(void*) = 2^%lu\n", ptr_size_bit_pow2());
 
-  uint bulk_size = 300;
+  uint bulk_size = 3;
 
   uint segment_size_ub = 1 << segment_size_n;
 
@@ -152,6 +266,10 @@ char gc_init(uint n){
 	 bulk_size * ptr_size_byte, 
 	 nb_bulk
 	 );
+
+  printf("(%p, %p)\n", min_segment_start, max_segment_end);
+  alloc_segment(nb_bulk);
+  printf("(%p, %p)\n", min_segment_start, max_segment_end);
 
   return -1;
 }
