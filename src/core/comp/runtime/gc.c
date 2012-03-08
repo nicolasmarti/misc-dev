@@ -60,6 +60,14 @@ typedef void** segment;
 // a magic number which will be place at the start of each segment
 void* magic_number;
 
+// in order to check if a pointer is in a segment that we allocated we keep the min of all segment starting address, and the max of all segment last address
+void* min_segment_start = (void*)(-1);
+void* max_segment_end = (void*)(0);
+
+// we have a global list of free segment
+void* free_segment_start = NULL;
+void* free_segment_end = NULL;
+
 /*
   a segment contain <nb_bulk> elements of void*[<bulk_size>] is composed of
 
@@ -141,10 +149,6 @@ uint nb_bulk_ub(uint max_size, uint bulk_size)
 
 }
 
-// in order to check if a pointer is in a segment that we allocated we keep the min of all segment starting address, and the max of all segment last address
-void* min_segment_start = (void*)(-1);
-void* max_segment_end = (void*)(0);
-
 // lookup the magic_number
 void* get_magic_number (void* segment){
   return *(void**)(segment);
@@ -157,44 +161,44 @@ void set_magic_number (void* segment, void* magic){
 
 // lookup the previous segment pointer
 void* get_segment_prev(void* segment){
-  return *(void**)(segment + 1);
+  return *(void**)(segment + 1*ptr_size_byte);
 }
 
 // lookup the next segment pointer
 void* get_segment_next(void* segment){
-  return *(void**)(segment + 2);
+  return *(void**)(segment + 2*ptr_size_byte);
 }
 
 // mutate the previous segment pointer
 void set_segment_prev(void* segment, void* prev){
-  *(void**)(segment + 1) = prev;
+  *(void**)(segment + 1*ptr_size_byte) = prev;
 }
 
 // mutate the next segment pointer
 void set_segment_next(void* segment, void* next){
-  *(void**)(segment + 2) = next;
+  *(void**)(segment + 2*ptr_size_byte) = next;
 }
 
 // lookup the counter
 uint get_segment_counter(void* segment){
-  return *(uint*)(segment + 3);
+  return *(uint*)(segment + 3*ptr_size_byte);
 }
 
 //mutate the counter
 void set_segment_counter(void* segment, uint counter){
-  *(uint*)(segment + 3) = counter;
+  *(uint*)(segment + 3*ptr_size_byte) = counter;
 }
 
 // get pointer to the alloc bitmap
 void* get_alloc_bitmap_ptr(void* segment)
 {
-  return (segment + 4);
+  return (segment + 4*ptr_size_byte);
 }
 
 // get pointer to the root bitmap
 void* get_root_bitmap_ptr(void* segment, uint nb_bulk)
 {
-  return (segment + 4 + bitmap_size_elt(nb_bulk));
+  return (segment + (4 + bitmap_size_elt(nb_bulk))*ptr_size_byte);
 }
 
 
@@ -202,7 +206,7 @@ void* get_root_bitmap_ptr(void* segment, uint nb_bulk)
 // clear counter and alloc bitmap of a segment 
 void clearABMandCount(void* segment, uint nb_bulk)
 {
-  memset(segment + 3, // counter is at offset 3
+  memset(segment + 3*ptr_size_byte, // counter is at offset 3
 	 0, // we put zeros
 	 (1+bitmap_size_elt(nb_bulk))*ptr_size_byte // on an array of void* of the size of the bitmap + counter
 	 );
@@ -211,10 +215,79 @@ void clearABMandCount(void* segment, uint nb_bulk)
 // clear counter and alloc&root bitmap of a segment 
 void clearARBMandCount(void* segment, uint nb_bulk)
 {
-  memset(segment + 3, // counter is at offset 3
+  memset(segment + 3*ptr_size_byte, // counter is at offset 3
 	 0, // we put zeros
 	 (1+2*bitmap_size_elt(nb_bulk))*ptr_size_byte // on an array of void* of the size of the bitmap + counter
 	 );
+}
+
+/* chaining of segments */
+
+// for debugging
+void print_list(void* start, void* end)
+{
+  printf("start := %p; ", start);
+  printf("end := %p\n", end);
+  while (start!=NULL)
+    {
+      void* segment = start;
+      printf("%p <- %p -> %p\n", get_segment_prev(segment), segment, get_segment_next(segment));
+      start = get_segment_next(segment);
+    }
+
+  printf("\n\n");
+
+  return;
+}
+
+// inserting a segment at the end of a list
+void insert_segment_end(void** start, void** end, void* segment)
+{
+  // if the list is empty start == end == null
+  // thus we set both to segment and set next and prev of segment to nil
+  if (*start == NULL){
+    *start = segment;
+    *end = segment;
+    set_segment_prev(segment, NULL);
+    set_segment_next(segment, NULL);
+    return;
+  }
+
+  // else we set the next of segment to NULL,
+  // prev, to the value of end
+  // the next pointer of the previous segment to segment
+  // and end to the segment
+  set_segment_next(segment, NULL);
+  set_segment_prev(segment, *end);
+  set_segment_next(*end, segment);
+  *end = segment;
+  return;
+
+}
+
+// taking a segment at the begining of a list
+void* take_segment_start(void** start, void** end)
+{
+  // if the list is empty start == end == null
+  // thus we return NULL
+  if (*start == NULL){
+    return NULL;
+  }
+
+  // else we grab the value of start as or result,
+  // we set it to the next of the grabbed segment,
+  // if there is a segment at the head of the list, then we set its prev to NULL
+  // else we set end at NULL
+  void* res = *start;
+  
+  *start = get_segment_next(res);
+  
+  if (*start != NULL)
+    set_segment_prev(*start, NULL);
+  else
+    *end = NULL;
+
+  return res;
 }
 
 
@@ -239,6 +312,13 @@ void* alloc_segment(uint nb_bulk){
 
   // clear counter and alloc/root bitmap
   clearARBMandCount(segment, nb_bulk);
+
+  // 
+  set_segment_prev(segment, NULL);
+  set_segment_next(segment, NULL);
+
+  // and finally put it in the free segment list
+  insert_segment_end(&free_segment_start, &free_segment_end, segment);
 
   return segment;
 }
@@ -268,7 +348,23 @@ char gc_init(uint n){
 	 );
 
   printf("(%p, %p)\n", min_segment_start, max_segment_end);
+
+  print_list(free_segment_start, free_segment_end);
   alloc_segment(nb_bulk);
+  alloc_segment(nb_bulk);
+  alloc_segment(nb_bulk);
+  alloc_segment(nb_bulk);
+  alloc_segment(nb_bulk);
+  alloc_segment(nb_bulk);
+  alloc_segment(nb_bulk);
+  print_list(free_segment_start, free_segment_end);
+  take_segment_start(&free_segment_start, &free_segment_end);
+  take_segment_start(&free_segment_start, &free_segment_end);
+  take_segment_start(&free_segment_start, &free_segment_end);
+  take_segment_start(&free_segment_start, &free_segment_end);
+  print_list(free_segment_start, free_segment_end);
+  take_segment_start(&free_segment_start, &free_segment_end);
+
   printf("(%p, %p)\n", min_segment_start, max_segment_end);
 
   return -1;
