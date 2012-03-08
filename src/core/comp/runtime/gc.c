@@ -29,8 +29,18 @@ uint floor_log2(uint x)
   return (r);
 }
 
+uint cell_log_n2(uint x, uint y)
+{
+  uint r = 1;
+  while (x >>= y) // unroll for more speed...
+    {
+      r++;
+    }
+  return (r);
+}
+
 // compute the floor value of the division of x by y
-uint floor_div(uint x, uint y){
+uint cell_div(uint x, uint y){
   
   int z = x/y;
   if (x % y == 0)
@@ -42,7 +52,7 @@ uint floor_div(uint x, uint y){
 
 uint ptr_size_bit_pow2;
 
-uint floor_div_ptr_size_bit(uint x)
+uint cell_div_ptr_size_bit(uint x)
 {
   uint y = x >> ptr_size_bit_pow2;
   
@@ -104,23 +114,31 @@ void* free_segment_end = NULL;
   
  */
 
+// the max level for a given number of bulk
+uint max_level(uint nb_bulk)
+{
+  return cell_log_n2(nb_bulk, ptr_size_bit_pow2);
+}
+
+
 // bitmap_size in pointer
 uint bitmap_size_elt(uint nb_bulk)
 {
   uint size = 0;
   uint curr_level = 0;
-  uint curr_level_size = floor_div_ptr_size_bit(nb_bulk);
+  uint curr_level_size = cell_div_ptr_size_bit(nb_bulk);
 
   for (; curr_level_size > 1; 
        ++curr_level, 
-	 curr_level_size = floor_div_ptr_size_bit(curr_level_size)
+	 curr_level_size = cell_div_ptr_size_bit(curr_level_size)
        )
     {
       //printf("sizeof(bitmap[%lu]) := %lu (<= %lu)\n", curr_level, curr_level_size, curr_level_size * ptr_size_bit);
       size += curr_level_size;  
     }
-  
-  //printf("sizeof(bitmap[%lu]) := 1 (<= %lu)\n", curr_level+1, ptr_size_bit);
+
+  if (curr_level+1 != max_level(nb_bulk))
+    printf("cell_log_n2(...) := %lu <> %lu\n", cell_log_n2(nb_bulk, ptr_size_bit_pow2), curr_level+1);
 
   return ++size;
 }
@@ -144,7 +162,7 @@ uint segment_size(uint nb_bulk, uint bulk_size)
 uint nb_bulk_ub(uint max_size, uint bulk_size)
 {
   // a first guess
-  uint res = floor_div(max_size, bulk_size*ptr_size_byte);
+  uint res = cell_div(max_size, bulk_size*ptr_size_byte);
 
   printf("init guess := %lu\n", res);
   
@@ -209,15 +227,15 @@ void* get_root_bitmap_ptr(void* segment, uint nb_bulk)
 }
 
 // from the starting address of a bitmap (given a nb_bulk), return the address of the level l bitmap
-void* get_level_l_bitmap_ptr(void* bitmap_ptr, uint nb_bulk, uint level){
+void* get_level_bitmap_ptr(void* bitmap_ptr, uint nb_bulk, uint level){
   
   uint offset = 0;
   uint curr_level = 0;
-  uint curr_level_size = floor_div_ptr_size_bit(nb_bulk);
+  uint curr_level_size = cell_div_ptr_size_bit(nb_bulk);
 
   for (; curr_level_size < level; 
        ++curr_level, 
-	 curr_level_size = floor_div_ptr_size_bit(curr_level_size))
+	 curr_level_size = cell_div_ptr_size_bit(curr_level_size))
     {
       offset += curr_level_size;  
     }
@@ -359,12 +377,99 @@ void* blockAddress(void* data_ptr, bm_index index, bm_mask mask, uint bulk_size)
 }
 
 // test if the bitptr for level i is set or not
-uint isMarked(void* bitmap_ptr, bm_index index, bm_mask mask, uint level, uint nb_bulk)
+uint isMarked(void* level_bitmap_ptr, bm_index index, bm_mask mask)
 {
-  void* bitmap = get_level_l_bitmap_ptr(bitmap_ptr, nb_bulk, level);
-  return mask & *(uint*)(bitmap + index*ptr_size_byte);
+  return mask & *(uint*)(level_bitmap_ptr + index*ptr_size_byte);
 
 }
+
+// give the size of element of a given level (correspond to the max index)
+bm_index get_level_max_index(uint nb_bulk, uint level){
+  
+  uint curr_level = 0;
+  uint curr_level_size = cell_div_ptr_size_bit(nb_bulk);
+
+  for (; curr_level_size < level; 
+       ++curr_level 
+       )
+    {
+      curr_level_size = cell_div_ptr_size_bit(curr_level_size);
+    }
+  
+  //printf("sizeof(bitmap[%lu]) := 1 (<= %lu)\n", curr_level+1, ptr_size_bit);
+
+  return --curr_level_size; 
+
+}
+
+// give the maximal mask for the last index of a given level
+bm_mask get_level_max_mask(uint nb_bulk, uint level){
+  
+  uint level_max_index = get_level_max_index(nb_bulk, level);
+  uint max_bulk_num = ptr_size_bit * level_max_index;
+  uint i;
+  for (i = 0; i < level; ++i) 
+    max_bulk_num *= ptr_size_bit;
+
+  return 1 << ptr_size_bit - (max_bulk_num - nb_bulk);
+}
+
+
+//return the next mask
+bm_mask nextMask(void* bitmap_ptr, bm_index index, bm_mask mask, uint level, uint nb_bulk)
+{
+  // overflow of index
+  uint level_max_index = get_level_max_index(nb_bulk, level);
+  if (index > level_max_index) return 0;
+  uint max_index_max_mask = get_level_max_mask(nb_bulk, level);
+
+  void* level_bitmap_ptr = get_level_bitmap_ptr(bitmap_ptr, nb_bulk, level);
+
+  // here we split the cases on the fact or not that we are on the max
+  if (index == level_max_index){
+
+    uint is_marked;
+    // loop while
+    while (mask && // the mask is not 0 and
+	   mask <= max_index_max_mask && // we are lower or equal to the max mask and
+	   (is_marked = isMarked(level_bitmap_ptr, index, mask)) // the current bit is marked
+	   )
+      // we increment the mask
+      mask <<= 1;
+    
+    // if it is marked, we set the mask to 0
+    if (is_marked) mask = 0;
+    
+  } else {
+
+    // same as before, except that we do not test for the max mask
+    uint is_marked;
+    // loop while
+    while (mask && // the mask is not 0 and
+	   (is_marked = isMarked(level_bitmap_ptr, index, mask)) // the current bit is marked
+	   )
+      // we increment the mask
+      mask <<= 1;
+    
+    // if it is marked, we set the mask to 0
+    if (is_marked) mask = 0;
+
+  }
+   
+  // we return the mask
+  return mask;
+}
+
+// TODO
+
+// forwardBitPtr
+
+// findNextFreeBlock
+
+// setBit
+
+// tryAlloc 
+
 
 //***************************************************************
 
@@ -463,8 +568,8 @@ char gc_init(uint n){
   uint i;
   for (i = 0; i < 10000; ++i)
     {
-      if (floor_div(i, ptr_size_bit) != floor_div_ptr_size_bit(i))
-	printf("%lu != %lu\n", floor_div(i, ptr_size_bit), floor_div_ptr_size_bit(i));
+      if (cell_div(i, ptr_size_bit) != cell_div_ptr_size_bit(i))
+	printf("%lu != %lu\n", cell_div(i, ptr_size_bit), cell_div_ptr_size_bit(i));
 	
     }
   return -1;
@@ -475,7 +580,7 @@ char gc_init(uint n){
 #ifdef WITHMAIN
 int main(int argc, char** argv, char** arge)
 {
-  gc_init(12);
+  gc_init(25);
   
   return 0;
 }
