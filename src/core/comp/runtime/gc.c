@@ -2,6 +2,8 @@
 #include<malloc.h> //memalign
 #include<string.h> //memset
 #include<stdbool.h> // bool, true, false
+
+
 /*
 
    this is a memeory allocator / garbage collector
@@ -14,6 +16,23 @@
 
  */
 typedef unsigned long uint;
+
+char *byte_to_binary
+(
+    uint x
+)
+{
+    static char b[33];
+    b[0] = '\0';
+
+    uint z;
+    for (z = 1; z > 0; z <<= 1)
+    {
+        strcat(b, ((x & z) == z) ? "1" : "0");
+    }
+
+    return b;
+}
 
 // the size of pointers
 #define ptr_size_byte (uint)(sizeof(void*))
@@ -70,6 +89,10 @@ uint cell_div_ptr_size_bit(uint x)
 // this allow to optimize the computation of a segment address from a chunk address
 uint segment_size_n;
 typedef void** segment;
+// this is the mask to apply to a bulk address to grab back the segment address
+uint segment_mask;
+// this is a mask to know if the value we have is a pointer to a bulk (align on a void*)
+uint pointer_mask;
 
 // in order to make sure that we are pointing to a segment, we create at initialization
 // a magic number which will be place at the start of each segment
@@ -416,7 +439,7 @@ void indexToBitPtr(bm_index i, bm_index* index, bm_mask* mask)
 //convert a bitptr to a bit index
 bm_index bitPtrToIndex(bm_index index, bm_mask mask)
 {
-  return index * ptr_size_bit + (floor_log2(mask) - 1);
+  return index * ptr_size_bit + (floor_log2(mask));
 }
 
 // convert a bitptr to a bulk address
@@ -534,6 +557,28 @@ void setBitAnd(void* bitmap_ptr, bm_index index, bm_mask mask, uint nb_bulk, uin
   return;
 }
 
+// setBitAnd: set a bit, and update the upper level w.r.t. a bitwise andif all bits are to one
+void unsetBitAnd(void* bitmap_ptr, bm_index index, bm_mask mask, uint nb_bulk, uint level)
+{
+  // grab the bitmap pointer of the level
+  void* bitmap_level_ptr = get_level_bitmap_ptr(bitmap_ptr, nb_bulk, level);
+  
+  // grab the corresponding bitmap of the index
+  uint bm = *(uint*)(bitmap_level_ptr + index*ptr_size_byte);
+
+  // set and with mask negation
+  *(uint*)(bitmap_level_ptr + index*ptr_size_byte) = bm & ~ mask;
+
+  // update upper map if necessary
+  if (level + 1 < max_level(nb_bulk))
+    {
+      bm_index i = index;
+      indexToBitPtr(i, &index, &mask);
+      unsetBitAnd(bitmap_ptr, index, mask, nb_bulk, level+1);
+    }
+  return;
+}
+
 // setBitOr: set a bit, and update the upper level w.r.t. a bitwise andif at least one bit is one
 void setBitOr(void* bitmap_ptr, bm_index index, bm_mask mask, uint nb_bulk, uint level)
 {
@@ -548,10 +593,36 @@ void setBitOr(void* bitmap_ptr, bm_index index, bm_mask mask, uint nb_bulk, uint
   *(uint*)(bitmap_level_ptr + index*ptr_size_byte) = bm;
 
   // update upper map if necessary
-  bm_index i = index;
-  indexToBitPtr(i, &index, &mask);
-  setBitOr(bitmap_ptr, index, mask, nb_bulk, level+1);
+  if (level + 1 < max_level(nb_bulk))
+    {
+      bm_index i = index;
+      indexToBitPtr(i, &index, &mask);
+      setBitOr(bitmap_ptr, index, mask, nb_bulk, level+1);
+    }
   
+  return;
+}
+
+// setBitAnd: set a bit, and update the upper level w.r.t. a bitwise andif all bits are to one
+void unsetBitOr(void* bitmap_ptr, bm_index index, bm_mask mask, uint nb_bulk, uint level)
+{
+  // grab the bitmap pointer of the level
+  void* bitmap_level_ptr = get_level_bitmap_ptr(bitmap_ptr, nb_bulk, level);
+  
+  // grab the corresponding bitmap of the index
+  uint bm = *(uint*)(bitmap_level_ptr + index*ptr_size_byte);
+
+  // set and with mask negation
+  *(uint*)(bitmap_level_ptr + index*ptr_size_byte) = bm & ~ mask;
+
+  // update upper map if necessary
+  if (level + 1 < max_level(nb_bulk) && bm == mask)
+    {
+      bm_index i = index;
+      indexToBitPtr(i, &index, &mask);
+      unsetBitOr(bitmap_ptr, index, mask, nb_bulk, level+1);
+    }
+
   return;
 }
 
@@ -606,7 +677,62 @@ void findNextFreeBlock(void* bitmap_ptr, bm_index *index, bm_mask *mask, uint nb
   return;
 }
 
-// getBulkBitPtr: from a bulk address, get the 
+// getBulkBitPtr: from a bulk address, get the bit pointer
+void getBulkBitPtr(void* data, bm_index *index, bm_mask *mask, void** seg)
+{
+  // first we check that the data might be in our segments
+  if (data < min_segment_start || data > max_segment_end)
+    {
+      printf("getBulkBitPtr: pointer outside segment range %p\n", 
+	     data
+	     );
+      *mask = 0; return;
+    }
+
+  // then we check that data is indeed a pointer of bulk
+  if (((uint)(data) & (pointer_mask)) > 0)
+    {
+      printf("getBulkBitPtr: not a pointer, %p(%s) & %p > 0 \n", 
+	     data, byte_to_binary((uint)(data)),
+	     (void*)(pointer_mask)
+	     //byte_to_binary((uint)(data)), 
+	     //byte_to_binary((uint)(pointer_mask))
+	     );
+      *mask = 0; return;
+    }
+
+  // first we grab the segment pointer
+  void* segment = (void*)((uint)(data) & (uint)(segment_mask));
+  
+  // we grab the magic number of the segment and check that is is valid
+  if (magic_number != *(void**)(segment))
+    {
+      printf("getBulkBitPtr: wrong magic number\n");
+      *mask = 0; return;
+    }
+
+  // seems ok, then grab nb_bulk, bulk_size and data_ptr of the segment
+  uint nb_bulk = get_segment_nb_bulk(segment);
+  uint bulk_size = get_segment_bulk_size(segment);
+  void* bulk_ptr = get_bulk_ptr(segment, nb_bulk);
+
+  // grab the offset of our bulk
+  uint bulk_offset = (uint)(data - bulk_ptr);
+
+  // last check: this is indeed a bulk
+  if (bulk_offset % (bulk_size * ptr_size_byte) != 0)
+    {
+      printf("getBulkBitPtr: not a bulk offset (%p, %p, %lu)\n", data, bulk_ptr, bulk_offset);
+      *mask = 0; return;
+    }
+
+  // we can compute the index and mask at level 0
+  indexToBitPtr(bulk_offset / (bulk_size * ptr_size_byte), index, mask);
+
+  *seg = segment;
+
+  return;
+}
 
 // alloc in a segment
 void* allocSegment(void* segment, bm_index *index, bm_mask *mask, bool root)
@@ -637,9 +763,12 @@ void* allocSegment(void* segment, bm_index *index, bm_mask *mask, bool root)
   
   // grab the data pointer
   void* data_ptr = get_bulk_ptr(segment, nb_bulk);
+  //printf("data_ptr = %p\n", data_ptr);
 
   // compute the allocated block index
   void* block = blockAddress(data_ptr, *index, *mask, bulk_size);
+  //printf("block_ptr = %p\n", block);
+
 
   // update the root bitmap if necessary
   if (root)
@@ -661,24 +790,47 @@ void* allocSegment(void* segment, bm_index *index, bm_mask *mask, bool root)
 
 }
 
-//***************************************************************
-const char *byte_to_binary
-(
-    uint x
-)
+// free in a segment
+void freeSegment(void* data)
 {
-    static char b[33];
-    b[0] = '\0';
+  // first we try to grab the segment/index/mask of the data
+  void* segment;
+  bm_index index;
+  bm_mask mask;
 
-    uint z;
-    for (z = 1; z > 0; z <<= 1)
-    {
-        strcat(b, ((x & z) == z) ? "1" : "0");
-    }
+  getBulkBitPtr(data, &index, &mask, &segment);
 
-    return b;
+  if (mask == 0)
+    return;
+
+  uint nb_bulk = get_segment_nb_bulk(segment);
+  uint bulk_size = get_segment_bulk_size(segment);
+
+  // we grab the root and alloc bitmap pointer
+  void* alloc_bitmap_ptr = get_alloc_bitmap_ptr(segment);
+  void* root_bitmap_ptr = get_root_bitmap_ptr(segment, nb_bulk);
+
+  // we test if alloc is set
+  if (!isMarked(alloc_bitmap_ptr, index, mask))
+    // no: we have nothing to so
+    return;
+
+  // else we unset
+  unsetBitAnd(alloc_bitmap_ptr, index, mask, nb_bulk, 0);
+
+  // we test if root is set
+  if (!isMarked(root_bitmap_ptr, index, mask))
+    // no: we have nothing to so
+    return;
+
+  // else we unset
+  unsetBitOr(root_bitmap_ptr, index, mask, nb_bulk, 0);
+
+  return;
+
 }
 
+//***************************************************************
 // print bitmap
 void print_bitmap(void* bitmap_ptr, uint nb_bulk)
 {
@@ -747,8 +899,10 @@ void init_segment(void* segment, uint nb_bulk, uint bulk_size)
 
 char gc_init(uint n){
 
+  // compute the power of two of a the size of a pointer
   ptr_size_bit_pow2 = floor_log2(ptr_size_bit);
 
+  // do some check
   if(sizeof(void*) != sizeof(uint)) {
     //we assert that it is a proper power of two
     printf("catasrophic: uint and void* are of different size !!!");
@@ -761,8 +915,30 @@ char gc_init(uint n){
     return 0;
   }
 
-
+  // init the the segment size and the mask
   segment_size_n = n;
+  segment_mask = 1;
+  uint i;
+  for (i = 1; i < segment_size_n; ++i)
+    {
+      segment_mask <<= 1;
+      segment_mask+=1;
+    }
+  segment_mask = ~segment_mask;
+  printf("segment_mask = %s\n", byte_to_binary((uint)(segment_mask)));
+  
+  // initialize the pointer mask
+  pointer_mask = 1;
+  for (i = 1; i < floor_log2(ptr_size_byte); ++i)
+    {
+      pointer_mask <<= 1;
+      pointer_mask+=1;
+    }
+  printf("pointer_mask = %s\n", byte_to_binary((uint)(pointer_mask)));  
+
+  // initialize magic_number
+  magic_number = (void*)(0xdeadbeef);
+
 
   printf("sizeof(void*) = 2^%lu\n", ptr_size_bit_pow2);
 
@@ -788,27 +964,61 @@ char gc_init(uint n){
   printf("segment: %p <--> %p\n", segment, segment + (1 << segment_size_n));
 
   void* alloc_ptr = get_alloc_bitmap_ptr(segment);
+  void* root_ptr = get_root_bitmap_ptr(segment, nb_bulk);
 
   printf("alloc_bitmap_ptr = %p\n", alloc_ptr);
 
   bm_index index = 0;
   bm_mask mask = 1;
   void* alloc = (void*)(1);
+  void* good_alloc = (void*)(1);
   uint count = 0;
   while (alloc != NULL)
     {
-      print_bitmap(alloc_ptr, nb_bulk);
-      alloc = allocSegment(segment, &index, &mask, false);
+      good_alloc=alloc;
+      //print_bitmap(alloc_ptr, nb_bulk);
+      //print_bitmap(root_ptr, nb_bulk);
+      alloc = allocSegment(segment, &index, &mask, true);
+
+      printf("alloc = %p\n", alloc);
+
+      /*
+      bm_index i;
+      bm_mask m;
+      void* seg;
+      getBulkBitPtr(alloc, &i, &m, &seg);
+      printf("alloc = (%lu, 0b%s)\n", i, byte_to_binary(m));
+      */
       ++count;
       //printf("alloc(%lu/%lu): %p\n", count, nb_bulk, alloc);
     }
   
   index = 0;
-  mask = 1;
-  alloc = allocSegment(segment, &index, &mask, false);
-  printf("alloc(%lu/%lu): %p\n", count, nb_bulk, alloc);
+  mask = 1;  
+  printf("alloc(%lu/%lu): %p\n", count, nb_bulk, allocSegment(segment, &index, &mask, true));
+  printf("\n\n");
   print_bitmap(alloc_ptr, nb_bulk);
+  print_bitmap(root_ptr, nb_bulk);
+  printf("\n\n");
 
+  // try to realease the last allocated
+  printf("free = %p\n", good_alloc);
+  freeSegment(good_alloc);
+  print_bitmap(alloc_ptr, nb_bulk);
+  print_bitmap(root_ptr, nb_bulk);
+  printf("\n\n");
+
+  index = 0;
+  mask = 1;  
+
+  printf("bitptr = (%lu, 0b%s)\n", index, byte_to_binary(mask));
+
+  alloc = allocSegment(segment, &index, &mask, true);
+  printf("alloc = %p\n", alloc);
+  printf("\n\n");
+  print_bitmap(alloc_ptr, nb_bulk);
+  print_bitmap(root_ptr, nb_bulk);
+  printf("\n\n");
   /*
   uint i;
   for (i = 0; i < 10000; ++i)
@@ -827,7 +1037,7 @@ char gc_init(uint n){
 #ifdef WITHMAIN
 int main(int argc, char** argv, char** arge)
 {
-  gc_init(12);
+  gc_init(6);
   
   return 0;
 }
