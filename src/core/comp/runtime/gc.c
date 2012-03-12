@@ -90,7 +90,10 @@ void* free_segment_end = NULL;
   
   - a pointer to the next segment (size = sizeof(void*))
   - a pointer to the previous segment (size = sizeof(void*))
-  
+
+  - the size of the bulk
+  - the number of bulk
+
   - a counter of the number of allocated elements (size = sizeof(void*))
 
   - a bitmap composed of
@@ -150,6 +153,8 @@ uint segment_size(uint nb_bulk, uint bulk_size)
   return (
 	  1 + // magic
 	  2 + // next/prev
+	  1 + // bulk_size
+	  1 + // nb_bulk
 	  1 + // counter
 	  bitmap_size_elt(nb_bulk) + //bitmap for allocated bits
 	  bitmap_size_elt(nb_bulk) + //bitmap for root bits
@@ -205,46 +210,66 @@ void set_segment_next(void* segment, void* next){
   *(void**)(segment + 2*ptr_size_byte) = next;
 }
 
+// lookup the bulk_size
+uint get_segment_bulk_size(void* segment){
+  return *(uint*)(segment + 3*ptr_size_byte);
+}
+
+//mutate the bulk_size
+void set_segment_bulk_size(void* segment, uint bulk_size){
+  *(uint*)(segment + 3*ptr_size_byte) = bulk_size;
+}
+
+// lookup the nb_bulk
+uint get_segment_nb_bulk(void* segment){
+  return *(uint*)(segment + 4*ptr_size_byte);
+}
+
+//mutate the nb_bulk
+void set_segment_nb_bulk(void* segment, uint nb_bulk){
+  *(uint*)(segment + 4*ptr_size_byte) = nb_bulk;
+}
+
+
 // lookup the counter
 uint get_segment_counter(void* segment){
-  return *(uint*)(segment + 3*ptr_size_byte);
+  return *(uint*)(segment + 5*ptr_size_byte);
 }
 
 //mutate the counter
 void set_segment_counter(void* segment, uint counter){
-  *(uint*)(segment + 3*ptr_size_byte) = counter;
+  *(uint*)(segment + 5*ptr_size_byte) = counter;
 }
 
 // increment the segment counter
 void inc_segment_counter(void* segment){
-  uint* counter = (uint*)(segment + 3*ptr_size_byte);
+  uint* counter = (uint*)(segment + 5*ptr_size_byte);
   *counter = *counter + 1;
 }
 
 // decrement the segment counter
 void dec_segment_counter(void* segment){
-  uint* counter = (uint*)(segment + 3*ptr_size_byte);
+  uint* counter = (uint*)(segment + 5*ptr_size_byte);
   *counter = *counter - 1;
 }
-
 
 // get pointer to the alloc bitmap
 void* get_alloc_bitmap_ptr(void* segment)
 {
-  return (segment + 4*ptr_size_byte);
+  return (segment + 6*ptr_size_byte);
 }
 
 // get pointer to the root bitmap
 void* get_root_bitmap_ptr(void* segment, uint nb_bulk)
 {
-  return (segment + (4 + bitmap_size_elt(nb_bulk))*ptr_size_byte);
+  return (segment + (6 + bitmap_size_elt(nb_bulk))*ptr_size_byte);
 }
 
 // get a pointer to the data
 void* get_bulk_ptr(void* segment, uint nb_bulk)
 {
   return (segment + (
-		     4 + 
+		     6 + 
 		     bitmap_size_elt(nb_bulk) * 2
 		     ) * ptr_size_byte
 	  );
@@ -258,7 +283,7 @@ void* get_level_bitmap_ptr(void* bitmap_ptr, uint nb_bulk, uint level){
   uint curr_level = 0;
   uint curr_level_size = cell_div_ptr_size_bit(nb_bulk);
 
-  for (; curr_level_size < level; 
+  for (; curr_level < level; 
        ++curr_level, 
 	 curr_level_size = cell_div_ptr_size_bit(curr_level_size))
     {
@@ -275,7 +300,7 @@ void* get_level_bitmap_ptr(void* bitmap_ptr, uint nb_bulk, uint level){
 // clear counter and alloc bitmap of a segment 
 void clearABMandCount(void* segment, uint nb_bulk)
 {
-  memset(segment + 3*ptr_size_byte, // counter is at offset 3
+  memset(segment + 5*ptr_size_byte, // counter is at offset 5
 	 0, // we put zeros
 	 (1+bitmap_size_elt(nb_bulk))*ptr_size_byte // on an array of void* of the size of the bitmap + counter
 	 );
@@ -284,7 +309,7 @@ void clearABMandCount(void* segment, uint nb_bulk)
 // clear counter and alloc&root bitmap of a segment 
 void clearARBMandCount(void* segment, uint nb_bulk)
 {
-  memset(segment + 3*ptr_size_byte, // counter is at offset 3
+  memset(segment + 5*ptr_size_byte, // counter is at offset 3
 	 0, // we put zeros
 	 (1+2*bitmap_size_elt(nb_bulk))*ptr_size_byte // on an array of void* of the size of the bitmap + counter
 	 );
@@ -407,7 +432,7 @@ bm_index get_level_max_index(uint nb_bulk, uint level){
   uint curr_level = 0;
   uint curr_level_size = cell_div_ptr_size_bit(nb_bulk);
 
-  for (; curr_level_size < level; 
+  for (; curr_level < level; 
        ++curr_level 
        )
     {
@@ -584,10 +609,14 @@ void findNextFreeBlock(void* bitmap_ptr, bm_index *index, bm_mask *mask, uint nb
 // getBulkBitPtr: from a bulk address, get the 
 
 // alloc in a segment
-void* allocSegment(void* segment, bm_index *index, bm_mask *mask, uint nb_bulk, uint bulk_size, bool root)
+void* allocSegment(void* segment, bm_index *index, bm_mask *mask, bool root)
 {
   // we grab the bitmap pointer
   void* bitmap_ptr = get_alloc_bitmap_ptr(segment);
+
+  // we grab the nb_bulk, bulk_size info
+  uint nb_bulk = get_segment_nb_bulk(segment);
+  uint bulk_size = get_segment_bulk_size(segment);
   
   // check that the bit pointer is valid, else return NULL
   uint level_max_index = get_level_max_index(nb_bulk, 0);
@@ -659,8 +688,10 @@ void print_bitmap(void* bitmap_ptr, uint nb_bulk)
       printf("level: %lu\n", level);
       uint index;
       void* level_ptr = get_level_bitmap_ptr(bitmap_ptr, nb_bulk, level);
-      for (index = 0; index <= get_level_max_index(nb_bulk, level); ++index)
-	printf("bm[%lu] := %s\n", level, byte_to_binary(*(uint*)(level_ptr + index*ptr_size_byte)));
+      uint index_max = get_level_max_index(nb_bulk, level);
+      printf("max index[%lu] := %lu\n", level, index_max);
+      for (index = 0; index <= index_max; ++index)
+	printf("bm[%lu] := %s\n", index, byte_to_binary(*(uint*)(level_ptr + index*ptr_size_byte)));
 
     }
   return;
@@ -669,9 +700,8 @@ void print_bitmap(void* bitmap_ptr, uint nb_bulk)
 
 //***************************************************************
 
-
 // allocate a new segment
-void* alloc_segment(uint nb_bulk){
+void* create_segment(){
 
   // compute the desired size (which is also the alignment
   uint segment_size_ub = 1 << segment_size_n;
@@ -686,12 +716,6 @@ void* alloc_segment(uint nb_bulk){
   if (max_segment_end < (segment + segment_size_ub)) 
     max_segment_end = (segment + segment_size_ub);
 
-  // update the magic number
-  set_magic_number(segment, magic_number);
-
-  // clear counter and alloc/root bitmap
-  clearARBMandCount(segment, nb_bulk);
-
   // 
   set_segment_prev(segment, NULL);
   set_segment_next(segment, NULL);
@@ -702,7 +726,22 @@ void* alloc_segment(uint nb_bulk){
   return segment;
 }
 
+//initialize a segment for a given nb_bulk / bulk_size
+void init_segment(void* segment, uint nb_bulk, uint bulk_size)
+{
 
+  // update the magic number
+  set_magic_number(segment, magic_number);
+
+  // clear counter and alloc/root bitmap
+  clearARBMandCount(segment, nb_bulk);
+
+  // we set the nb_bulk / bulk_size information
+  set_segment_bulk_size(segment, bulk_size);
+  set_segment_nb_bulk(segment, nb_bulk);
+
+  return;
+}
 
 /***********************************************************************************************/
 
@@ -743,28 +782,8 @@ char gc_init(uint n){
 
   printf("(%p, %p)\n", min_segment_start, max_segment_end);
 
-  /*
-  print_list(free_segment_start, free_segment_end);
-  alloc_segment(nb_bulk);
-  alloc_segment(nb_bulk);
-  alloc_segment(nb_bulk);
-  alloc_segment(nb_bulk);
-  alloc_segment(nb_bulk);
-  alloc_segment(nb_bulk);
-  alloc_segment(nb_bulk);
-  print_list(free_segment_start, free_segment_end);
-  take_segment_start(&free_segment_start, &free_segment_end);
-  take_segment_start(&free_segment_start, &free_segment_end);
-  take_segment_start(&free_segment_start, &free_segment_end);
-  take_segment_start(&free_segment_start, &free_segment_end);
-  print_list(free_segment_start, free_segment_end);
-  take_segment_start(&free_segment_start, &free_segment_end);
-
-  printf("(%p, %p)\n", min_segment_start, max_segment_end);
-  */
-
-
-  void* segment = alloc_segment(nb_bulk);  
+  void* segment = create_segment();  
+  init_segment(segment, nb_bulk, bulk_size);
 
   printf("segment: %p <--> %p\n", segment, segment + (1 << segment_size_n));
 
@@ -779,19 +798,16 @@ char gc_init(uint n){
   while (alloc != NULL)
     {
       print_bitmap(alloc_ptr, nb_bulk);
-      alloc = allocSegment(segment, &index, &mask, nb_bulk, bulk_size, false);
+      alloc = allocSegment(segment, &index, &mask, false);
       ++count;
-      printf("alloc(%lu/%lu): %p\n", count, nb_bulk, alloc);
+      //printf("alloc(%lu/%lu): %p\n", count, nb_bulk, alloc);
     }
-
-  print_bitmap(get_alloc_bitmap_ptr(segment), nb_bulk);
-
-  print_bitmap(alloc_ptr, nb_bulk);
+  
   index = 0;
   mask = 1;
-  alloc = allocSegment(segment, &index, &mask, nb_bulk, bulk_size, false);
-  ++count;
+  alloc = allocSegment(segment, &index, &mask, false);
   printf("alloc(%lu/%lu): %p\n", count, nb_bulk, alloc);
+  print_bitmap(alloc_ptr, nb_bulk);
 
   /*
   uint i;
