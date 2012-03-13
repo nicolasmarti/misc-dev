@@ -386,6 +386,31 @@ void insert_segment_end(void** start, void** end, void* segment)
 
 }
 
+// inserting a segment at the start of a list
+void insert_segment_start(void** start, void** end, void* segment)
+{
+  // if the list is empty start == end == null
+  // thus we set both to segment and set next and prev of segment to nil
+  if (*start == NULL){
+    *start = segment;
+    *end = segment;
+    set_segment_prev(segment, NULL);
+    set_segment_next(segment, NULL);
+    return;
+  }
+
+  // else we set the prev of segment to NULL,
+  // next, to the value of start
+  // the prev pointer of the next segment to segment
+  // and start to the segment
+  set_segment_prev(segment, NULL);
+  set_segment_next(segment, *start);
+  set_segment_prev(*start, segment);
+  *start = segment;
+  return;
+
+}
+
 // taking a segment at the begining of a list
 void* take_segment_start(void** start, void** end)
 {
@@ -409,6 +434,66 @@ void* take_segment_start(void** start, void** end)
     *end = NULL;
 
   return res;
+}
+
+// taking a segment in a list
+void take_segment(void** start, void** end, void* segment)
+{
+  void* next_segment = get_segment_next(segment);
+  void* prev_segment = get_segment_prev(segment);
+
+  // we first update the next segment
+  if (next_segment == NULL)
+    {
+      // there is no next segment, we update the end pointer
+      *end = prev_segment;
+    }
+  else
+    {
+      // else we set the prev of next to prev
+      set_segment_prev(next_segment, prev_segment);
+    }
+
+  // we then update the prev segment
+  if (prev_segment == NULL)
+    {
+      // there is no prev segment, we update the start pointer
+      *start = next_segment;
+    }
+  else
+    {
+      // else we set the prev of next to prev
+      set_segment_next(prev_segment, next_segment);
+    }
+  
+  return;
+}
+
+// switch to segment (the one pointed by segment, and its next one
+void switch_segment_next(void** start, void** end, void* segment)
+{
+  void* next_segment = get_segment_next(segment);
+  if (next_segment == NULL) return;
+
+  // we switch segment in the list
+  set_segment_next(segment, get_segment_next(next_segment));
+  set_segment_prev(next_segment, get_segment_prev(segment));
+  
+  set_segment_prev(segment, next_segment);
+  set_segment_next(next_segment, segment);
+  
+  // we possibly update the start end pointer of the heap or the previous
+  if (get_segment_next(segment) == NULL)
+    *end = segment;
+  else
+    set_segment_prev(get_segment_next(segment), segment);
+  
+  if (get_segment_prev(next_segment) == NULL)
+    *start = next_segment;
+  else
+    set_segment_next(get_segment_prev(next_segment), next_segment);
+
+  return;
 }
 
 //***************************************************************
@@ -775,7 +860,6 @@ void init_segment(void* segment, uint nb_bulk, uint bulk_size)
   return;
 }
 
-
 // alloc in a segment
 void* allocSegment(void* segment, bm_index *index, bm_mask *mask, bool root, uint nb_bulk, uint bulk_size)
 {
@@ -941,19 +1025,12 @@ void freeBlock(void* data)
 
   // else we try to shift to the right the segment in the heap list as long as we do not encounter the the heap current pointer or we have a less allocated segment
   void* next_segment;
-  while ((next_segment = get_segment_next(segment)) && get_segment_counter(next_segment) > get_segment_counter(segment)){
+  while ((next_segment = get_segment_next(segment)) && // their is a next segment
+	 get_segment_counter(next_segment) > get_segment_counter(segment) // of size greater than the current one
+	 ){
 
-    // we switch segment in the list
-    set_segment_next(segment, get_segment_next(next_segment));
-    set_segment_prev(next_segment, get_segment_prev(segment));
+    switch_segment_next(&(h->segment_start), &(h->segment_end), segment);
 
-    // we possibly update the start end pointer of the heap
-    if (get_segment_next(segment) == NULL)
-      h->segment_end = segment;
-    
-    if (get_segment_prev(next_segment) == NULL)
-      h->segment_start = next_segment;
-    
     // if the heap current segment was the next one, we update the heap
     if (h->curr_segment == next_segment)
       {
@@ -963,6 +1040,63 @@ void freeBlock(void* data)
 	return;
       }
   }
+
+  return;
+
+}
+
+// rearrangeSegList:
+// this function basically order the segment of a heap by decreasing count
+// segments with count 0 are put back in the free segment list 
+// and the heap current segment is the first not full segment
+void rearrangeSegList(heap* h)
+{
+  void* curr_segment = h->segment_start;
+  // we traverse the list of segments
+  while (curr_segment != NULL)
+    {
+      // we save the pointer of the next_segment
+      void* next_segment = get_segment_next(curr_segment);
+
+      // if the segment count is zero, we grab it, and put it in the free segment list
+      if (get_segment_counter(curr_segment) == 0)
+	{
+	  take_segment(&(h->segment_start), &(h->segment_end), curr_segment);
+	  insert_segment_end(&free_segment_start, &free_segment_end, curr_segment);
+
+	  // if the heap current pointer was on this segment, we set it to the next one
+	  if (h->curr_segment == curr_segment)
+	    {
+	      h->curr_segment = next_segment;
+	      h->index = 0;
+	      h->mask = 1;
+	    }
+	}
+      else
+	{
+	  // if the segment is full we grab it, and insert it back at the start of the list
+	  if (get_segment_counter(curr_segment) == h->nb_bulk)
+	    {
+	      take_segment(&(h->segment_start), &(h->segment_end), curr_segment);
+	      insert_segment_start(&(h->segment_start), &(h->segment_end), curr_segment);
+
+	      // if the heap current pointer was on this segment, we set it to the next one
+	      if (h->curr_segment == curr_segment)
+		{
+		  h->curr_segment = next_segment;
+		  h->index = 0;
+		  h->mask = 1;
+		}
+	      
+	    }
+	  
+	  // else we do nothing
+	  
+	}
+
+      // we update the traversal pointer
+      curr_segment = next_segment;
+    }
 
   return;
 
@@ -1062,7 +1196,11 @@ char gc_init(uint n){
 
   printf("(%p, %p)\n", min_segment_start, max_segment_end);
 
-  // add free segments
+  // add 6 free segments
+  create_segment();
+  create_segment();
+  create_segment();
+  create_segment();  
   create_segment();
   create_segment();
 
@@ -1070,6 +1208,7 @@ char gc_init(uint n){
   
   // some test 
 
+  // alloc as much as possibly: all segment should be used
   void* alloc = (void*)(1);
   void* good_alloc = NULL;
   uint count = 0;
@@ -1087,17 +1226,41 @@ char gc_init(uint n){
 
     }
 
-  printf("nb alloc := %lu\n", count);
+  print_list(h.segment_start, h.segment_end);
+  printf("nb alloc := %lu (== %lu)\n\n", count, 6*h.nb_bulk);
   
-  // try to realease the last allocated
+  // try to realease the first allocated (in the first segment)
   freeBlock(good_alloc);
   printf("free = %p\n", good_alloc);
+  print_list(h.segment_start, h.segment_end);
   printf("\n\n");
 
   // try to realloc
 
   alloc = allocHeap(&h, true);
   printf("alloc = %p\n", alloc);
+
+  // we artificially reset counter/bitmap of the second segment of the heap
+  printf("clearing segment 2 (%p)\n", get_segment_next(h.segment_start));
+  clearARBMandCount(get_segment_next(h.segment_start), h.nb_bulk);
+
+  // then we rearrange 
+  printf("rearranging list\n");
+  rearrangeSegList(&h);
+
+  // and we try to reallocate
+  count = 0;
+  while (alloc != NULL)
+    {
+
+      alloc = allocHeap(&h, true);
+
+      if (alloc != NULL) 
+	++count;
+
+    }
+
+  printf("nb alloc := %lu (== %lu)\n", count, h.nb_bulk);
 
   return -1;
 }
