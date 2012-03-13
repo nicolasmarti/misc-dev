@@ -483,9 +483,7 @@ bm_mask get_level_max_mask(uint nb_bulk, uint level){
 // test if the bitptr for level i is set or not
 uint isMarked(void* level_bitmap_ptr, bm_index index, bm_mask mask)
 {
-  printf("isMarked (%lu, %s)\n", index, byte_to_binary(mask));
   return mask & *(uint*)(level_bitmap_ptr + index*ptr_size_byte);
-
 }
 
 //return the next mask
@@ -960,8 +958,8 @@ void freeBlock(void* data)
     if (h->curr_segment == next_segment)
       {
 	h->curr_segment = segment;
-	h->index = 0;
-	h->mask = 1;
+	h->index = index;
+	h->mask = mask;
 	return;
       }
   }
@@ -1066,23 +1064,30 @@ char gc_init(uint n){
 
   // add free segments
   create_segment();
+  create_segment();
 
   print_list(free_segment_start, free_segment_end);
   
   // some test 
 
   void* alloc = (void*)(1);
-  void* good_alloc = (void*)(1);
+  void* good_alloc = NULL;
   uint count = 0;
   while (alloc != NULL)
     {
-      good_alloc=alloc;
+
       alloc = allocHeap(&h, true);
 
-      printf("alloc = %p\n", alloc);
-      ++count;
+      if (good_alloc == NULL && alloc != NULL)
+	good_alloc = alloc;
+
+      //printf("alloc = %p\n", alloc);
+      if (alloc != NULL) 
+	++count;
 
     }
+
+  printf("nb alloc := %lu\n", count);
   
   // try to realease the last allocated
   freeBlock(good_alloc);
@@ -1102,7 +1107,7 @@ char gc_init(uint n){
 #ifdef WITHMAIN
 int main(int argc, char** argv, char** arge)
 {
-  gc_init(6);
+  gc_init(12);
   
   return 0;
 }
