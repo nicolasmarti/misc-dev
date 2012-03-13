@@ -1075,10 +1075,15 @@ void rearrangeSegList(heap* h)
       else
 	{
 	  // if the segment is full we grab it, and insert it back at the start of the list
-	  if (get_segment_counter(curr_segment) == h->nb_bulk)
+	  // only if the one before is not full
+	  if (get_segment_counter(curr_segment) == h->nb_bulk) // this segment is full and    
 	    {
-	      take_segment(&(h->segment_start), &(h->segment_end), curr_segment);
-	      insert_segment_start(&(h->segment_start), &(h->segment_end), curr_segment);
+	      // if the previous one exists and is not full, we grab it and put it at the start of the list	      
+	      if (next_segment != NULL && get_segment_counter(curr_segment) < h->nb_bulk)
+		{
+		  take_segment(&(h->segment_start), &(h->segment_end), curr_segment);
+		  insert_segment_start(&(h->segment_start), &(h->segment_end), curr_segment);
+		}
 
 	      // if the heap current pointer was on this segment, we set it to the next one
 	      if (h->curr_segment == curr_segment)
@@ -1247,6 +1252,7 @@ char gc_init(uint n){
   // then we rearrange 
   printf("rearranging list\n");
   rearrangeSegList(&h);
+  print_list(h.segment_start, h.segment_end);
 
   // and we try to reallocate
   count = 0;
@@ -1261,6 +1267,7 @@ char gc_init(uint n){
     }
 
   printf("nb alloc := %lu (== %lu)\n", count, h.nb_bulk);
+  print_list(h.segment_start, h.segment_end);
 
   return -1;
 }
