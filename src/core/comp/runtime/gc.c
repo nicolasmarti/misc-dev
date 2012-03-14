@@ -914,6 +914,7 @@ void* allocSegment(void* segment, bm_index *index, bm_mask *mask, bool root, uin
 	 0,
 	 bulk_size*ptr_size_byte
 	 );
+  
 
   // we found the next free block, pointed by index/mask
   return block;
@@ -997,15 +998,19 @@ void freeBlock(void* data)
   void* alloc_bitmap_ptr = get_alloc_bitmap_ptr(segment);
   void* root_bitmap_ptr = get_root_bitmap_ptr(segment, nb_bulk);
 
-  // we test if alloc is set
-  if (isMarked(alloc_bitmap_ptr, index, mask))
-    // yes: reset it
-    unsetBitAnd(alloc_bitmap_ptr, index, mask, nb_bulk, 0);
-
   // we test if root is set
   if (isMarked(root_bitmap_ptr, index, mask))
     // yes: reset it
     unsetBitOr(root_bitmap_ptr, index, mask, nb_bulk, 0);
+  else
+    // nothing to do: it was not allocated
+    return;
+
+  // we test if alloc is set
+  //if (isMarked(alloc_bitmap_ptr, index, mask))
+  // yes: reset it (if the root bit is set, then the alloc is also set
+  unsetBitAnd(alloc_bitmap_ptr, index, mask, nb_bulk, 0);
+
   
   // we update the counter
   dec_segment_counter(segment);
@@ -1282,7 +1287,7 @@ char gc_init(uint n){
 #ifdef WITHMAIN
 int main(int argc, char** argv, char** arge)
 {
-  gc_init(20);
+  gc_init(21);
   
   return 0;
 }
