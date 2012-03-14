@@ -829,6 +829,9 @@ void* create_segment(){
 
   // allocate
   void* segment = memalign(segment_size_ub, segment_size_ub);
+
+  if (segment == NULL)
+    return NULL;
   
   // update boundaries for segments address
   if (min_segment_start > segment) 
@@ -863,6 +866,7 @@ void init_segment(void* segment, uint nb_bulk, uint bulk_size)
 // alloc in a segment
 void* allocSegment(void* segment, bm_index *index, bm_mask *mask, bool root, uint nb_bulk, uint bulk_size)
 {
+
   // we grab the bitmap pointer
   void* bitmap_ptr = get_alloc_bitmap_ptr(segment);
 
@@ -875,7 +879,6 @@ void* allocSegment(void* segment, bm_index *index, bm_mask *mask, bool root, uin
   // test if the current pointed bit is marked
   if (isMarked(bitmap_ptr, *index, *mask))
     {
-      printf("is_marked!\n");
       // yes, let's find the next free block
       findNextFreeBlock(bitmap_ptr, index, mask, nb_bulk, 0);
       
@@ -890,8 +893,6 @@ void* allocSegment(void* segment, bm_index *index, bm_mask *mask, bool root, uin
 
   // compute the allocated block index
   void* block = blockAddress(data_ptr, *index, *mask, bulk_size);
-  //printf("block_ptr = %p\n", block);
-
 
   // update the root bitmap if necessary
   if (root)
@@ -911,7 +912,7 @@ void* allocSegment(void* segment, bm_index *index, bm_mask *mask, bool root, uin
   // we reset the mem allocated, to help in case of collection
   memset(block,
 	 0,
-	 nb_bulk*bulk_size*ptr_size_byte
+	 bulk_size*ptr_size_byte
 	 );
 
   // we found the next free block, pointed by index/mask
@@ -1149,6 +1150,8 @@ char gc_init(uint n){
 
   // init the the segment size and the mask
   segment_size_n = n;
+  printf("n := %lu\n", n);
+
   segment_mask = 1;
   uint i;
   for (i = 1; i < segment_size_n; ++i)
@@ -1184,7 +1187,7 @@ char gc_init(uint n){
   h.segment_start = NULL;
   h.segment_end = NULL;
   h.curr_segment = NULL;
-  h.bulk_size = 3;
+  h.bulk_size = 10;
   h.nb_bulk = nb_bulk_ub(segment_size_ub, h.bulk_size);
   h.index = 0;
   h.mask = 1;
@@ -1227,9 +1230,11 @@ char gc_init(uint n){
 
       //printf("alloc = %p\n", alloc);
       if (alloc != NULL) 
-	++count;
+	{ ++count; /*printf(".");*/ }
 
     }
+
+  printf("\n\n");
 
   print_list(h.segment_start, h.segment_end);
   printf("nb alloc := %lu (== %lu)\n\n", count, 6*h.nb_bulk);
@@ -1277,7 +1282,7 @@ char gc_init(uint n){
 #ifdef WITHMAIN
 int main(int argc, char** argv, char** arge)
 {
-  gc_init(12);
+  gc_init(20);
   
   return 0;
 }
