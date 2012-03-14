@@ -562,7 +562,7 @@ bm_mask get_level_max_mask(uint nb_bulk, uint level){
   for (i = 0; i < level; ++i) 
     max_bulk_num *= ptr_size_bit;
 
-  return 1 << ptr_size_bit - (max_bulk_num - nb_bulk);
+  return 1 << (ptr_size_bit - (max_bulk_num - nb_bulk));
 }
 
 // test if the bitptr for level i is set or not
@@ -991,7 +991,7 @@ void freeBlock(void* data)
 
   // and the number of bulk and their size
   uint nb_bulk = h->nb_bulk;
-  uint bulk_size = h->bulk_size;
+  //uint bulk_size = h->bulk_size;
 
   // we grab the root and alloc bitmap pointer
   void* alloc_bitmap_ptr = get_alloc_bitmap_ptr(segment);
