@@ -49,6 +49,22 @@ uint floor_log2(uint x)
   return (r);
 }
 
+// compute cell(log2(x))
+uint cell_log2(uint x)
+{
+  uint y = x;
+  uint r = 0;
+  while (y >>= 1) // unroll for more speed...
+    {
+      r++;
+    }
+
+  if ((1 << r) < x)
+    ++r;
+
+  return (r);
+}
+
 uint cell_log_n2(uint x, uint y)
 {
   uint r = 1;
@@ -180,8 +196,10 @@ uint bitmap_size_elt(uint nb_bulk)
       size += curr_level_size;  
     }
 
+  /*
   if (curr_level+1 != max_level(nb_bulk))
     printf("cell_log_n2(...) := %lu <> %lu\n", cell_log_n2(nb_bulk, ptr_size_bit_pow2), curr_level+1);
+  */
 
   return ++size;
 }
@@ -208,7 +226,7 @@ uint nb_bulk_ub(uint max_size, uint bulk_size)
   // a first guess
   uint res = cell_div(max_size, bulk_size*ptr_size_byte);
 
-  printf("init guess := %lu\n", res);
+  //printf("init guess := %lu\n", res);
   
   // then we iterate to find the max number of bulk
   while (segment_size(res, bulk_size) > max_size)
@@ -1286,7 +1304,7 @@ void markAndPush(void* data, void** stacktop)
 }
 
 // tracingliveobjects of a heap
-void tracingHeapLiveObjects(heap* h)
+void traceHeapLiveObjects(heap* h)
 {
   // the stack pointer (initially NULL)
   void* stackp = NULL;
@@ -1392,8 +1410,195 @@ void tracingHeapLiveObjects(heap* h)
 
 }
 
+// initialization of a heap for a given bulk_size
+void initHeap(heap* h, uint bulk_size)
+{
 
-/***********************************************************************************************/
+  // segment_size
+  uint segment_size_ub = 1 << segment_size_n;
+
+  h->segment_start = NULL;
+  h->segment_end = NULL;
+  h->curr_segment = NULL;
+  h->bulk_size = bulk_size;
+  h->nb_bulk = nb_bulk_ub(segment_size_ub, bulk_size);
+  h->index = 0;
+  h->mask = 1;
+
+  return;
+}
+
+// clearing all bitmaps and counts of the segments of a given heap
+void clearAllBitmapsAndCount(heap* h)
+{
+  void* curr_segment = h->segment_start;
+
+  uint nb_bulk = h->nb_bulk;
+
+  // we traverse the list of segments
+  while (curr_segment != NULL)
+    {
+      clearABMandCount(curr_segment, nb_bulk);
+      
+      curr_segment = get_segment_next(curr_segment);
+    }
+
+  return;
+}
+
+/******************************************************************************************/
+// global variables of the GC
+
+// the maximal bulk_size in power of 2 of void* (represents also the number of heap - 1)
+uint max_bulk_size;
+
+// the heaps: a series of heap of bulk_size = 2^n, for increasing n (with at least one element)
+heap *heaps;
+
+// entry functions
+
+// tracing all live objects
+void traceLiveObjects()
+{
+  // we just traverse all the heap and call their trace functions
+  uint i;
+
+  for (i = 0; i <= max_bulk_size; ++i)
+    traceHeapLiveObjects(&(heaps[i]));
+
+  return;
+
+}
+
+// bitmap marking and garbage collecting
+void bitmapMarkingGC()
+{
+  // first clear all alloc bitmap and counter for all heap
+  uint i;
+
+  for (i = 0; i <= max_bulk_size; ++i)
+    clearAllBitmapsAndCount(&(heaps[i]));
+
+  // trace live objects
+  traceLiveObjects();
+
+  // rearrange the segments
+  for (i = 0; i <= max_bulk_size; ++i)
+    rearrangeSegList(&(heaps[i]));
+
+  return;
+
+}
+
+// allocation function (the bool means that it is a root)
+void* alloc(uint size, bool root)
+{
+  // first grab the cell floor of log 2 of size: this is the index in the heap array
+  // size is in byte, while the bulk_size are in sizeof(void*) 
+  uint n = cell_log2(size/ptr_size_byte);
+
+  // to big to allocate (here we might want to have the copying GC)
+  if (n > max_bulk_size)
+    return NULL;
+
+  void* res = allocHeap(&(heaps[n]), root);
+
+  // the allocation fails
+  if (res== NULL)
+    {
+      // first, let's try to clean up a bit
+      bitmapMarkingGC();
+      // then retry allocating
+      res = allocHeap(&(heaps[n]), root);
+
+      // still a failure
+      if (res== NULL)
+	{
+	  // let's try allocating a new segment
+	  if (create_segment() != NULL)
+	    // last chance allocation (should be ok)
+	    res = allocHeap(&(heaps[n]), root);
+
+	}
+
+    }
+
+  return res;
+
+}
+
+// the freeing of data (only work for root)
+void free(void* data)
+{
+  return freeBlock(data);
+}
+
+// unset as root
+void unset_root(void* data)
+{
+  // first we try to grab the segment/index/mask of the data
+  void* segment;
+  bm_index index;
+  bm_mask mask;
+
+  getBulkBitPtr(data, &index, &mask, &segment);
+
+  // we failed: the data is not managed by the garbage collector
+  if (mask == 0)
+    return;
+
+  // we grab the segment pointer
+  heap* h = get_segment_heap(segment);
+
+  // and the number of bulk and their size
+  uint nb_bulk = h->nb_bulk;
+
+  // we grab the root and alloc bitmap pointer
+  void* root_bitmap_ptr = get_root_bitmap_ptr(segment, nb_bulk);
+
+  // we test if root is set
+  if (isMarked(root_bitmap_ptr, index, mask))
+    // yes: reset it
+    unsetBitOr(root_bitmap_ptr, index, mask, nb_bulk, 0);
+
+  return;
+
+}
+
+// set as root
+void set_root(void* data)
+{
+  // first we try to grab the segment/index/mask of the data
+  void* segment;
+  bm_index index;
+  bm_mask mask;
+
+  getBulkBitPtr(data, &index, &mask, &segment);
+
+  // we failed: the data is not managed by the garbage collector
+  if (mask == 0)
+    return;
+
+  // we grab the segment pointer
+  heap* h = get_segment_heap(segment);
+
+  // and the number of bulk and their size
+  uint nb_bulk = h->nb_bulk;
+
+  // we grab the root and alloc bitmap pointer
+  void* root_bitmap_ptr = get_root_bitmap_ptr(segment, nb_bulk);
+
+  // we test if root is set
+  if (!isMarked(root_bitmap_ptr, index, mask))
+    // no: set it
+    setBitOr(root_bitmap_ptr, index, mask, nb_bulk, 0);
+
+  return;
+
+}
+
+
+/******************************************************************************************/
 
 char gc_init(uint n){
 
@@ -1446,6 +1651,22 @@ char gc_init(uint n){
   // segment_size
   uint segment_size_ub = 1 << segment_size_n;
 
+  // initialize the heap
+  // first compute the max bulk_size (as a power of two, starting from n)
+  max_bulk_size = n;
+  while (nb_bulk_ub(segment_size_ub, 1 << max_bulk_size) == 0)
+    (--max_bulk_size);
+  
+  printf("max_bulk_size = %lu\n", max_bulk_size);
+
+  //allocate the heap
+  heaps = (heap*)(malloc(sizeof(heap) * (max_bulk_size+1)));
+
+  // and initialize the heaps
+  for (i = 0; i <= max_bulk_size; ++i)
+    initHeap(&heaps[i], 1 << i);
+
+  /*
   // a heap
   heap h;
 
@@ -1553,10 +1774,8 @@ char gc_init(uint n){
   printf("**************** garbage collecting *********************\n");
 
   // call tracing
-  tracingHeapLiveObjects(&h);
-  
-
-  //print_list(h.segment_start, h.segment_end, h.nb_bulk);
+  traceHeapLiveObjects(&h);
+  */
 
   return -1;
 }
