@@ -590,12 +590,15 @@ uint isMarked(void* level_bitmap_ptr, bm_index index, bm_mask mask)
 //return the next mask such that the bit is marked | unmarkd
 bm_mask nextMask(void* bitmap_ptr, bm_index index, bm_mask mask, uint level, uint nb_bulk, uint lookingfor)
 {
+  if (mask == 0) return 0;
   // overflow of index
   uint level_max_index = get_level_max_index(nb_bulk, level);
   if (index > level_max_index) return 0;
   uint max_index_max_mask = get_level_max_mask(nb_bulk, level);
 
   void* level_bitmap_ptr = get_level_bitmap_ptr(bitmap_ptr, nb_bulk, level);
+
+  //printf("nextMask (%lu, %s) := ", index, byte_to_binary(mask));
 
   // here we split the cases on the fact or not that we are on the max
   if (index == level_max_index){
@@ -628,6 +631,8 @@ bm_mask nextMask(void* bitmap_ptr, bm_index index, bm_mask mask, uint level, uin
 
   }
    
+  //printf("%s\n", byte_to_binary(mask));
+
   // we return the mask
   return mask;
 }
@@ -729,12 +734,29 @@ void unsetBitOr(void* bitmap_ptr, bm_index index, bm_mask mask, uint nb_bulk, ui
 // forwardBitPtr: forward the bitptr, until it points to a valid unset bit
  void forwardBitPtr(void* bitmap_ptr, bm_index *index, bm_mask *mask, uint nb_bulk, uint level, uint lookingfor)
 {
+ 
   // we return false, if we are beyond the proper number of level
   if (level + 1 >= max_level(nb_bulk))
     {
       *mask = 0;
       return;
     }
+
+  // looking for overflow
+  
+  uint level_max_index = get_level_max_index(nb_bulk, level);
+  if (*index > level_max_index) 
+    {
+      *mask = 0;
+      return;
+    }
+  uint max_index_max_mask = get_level_max_mask(nb_bulk, level);
+  if (*index == level_max_index && *mask >= max_index_max_mask)
+    {
+      *mask = 0;
+      return;
+    }
+  
 
   bm_mask next_mask;
   bm_index next_index;
@@ -759,6 +781,9 @@ void unsetBitOr(void* bitmap_ptr, bm_index index, bm_mask mask, uint nb_bulk, ui
   // we have or info in next_xxx
   *index = bitPtrToIndex(next_index, next_mask);
   *mask = nextMask(bitmap_ptr, *index, 1, level, nb_bulk, lookingfor);
+
+  //printf("forward bit ptr stop\n");
+
   return;
 }
 
@@ -777,9 +802,10 @@ void findNextFreeBlock(void* bitmap_ptr, bm_index *index, bm_mask *mask, uint nb
   return;
 }
 
-// findNextAllocatedBlock: look for the next allocated block
+// findNextAllocatedBlock: look for the next allocated block (and increment)
 void findNextAllocatedBlock(void* bitmap_ptr, bm_index *index, bm_mask *mask, uint nb_bulk, uint level)
 {
+  inc_bitptr(index, mask);
   *mask = nextMask(bitmap_ptr, *index, *mask, level, nb_bulk, 1);
 
   if (*mask == 0)
@@ -847,6 +873,25 @@ void getBulkBitPtr(void* data, bm_index *index, bm_mask *mask, void** seg)
 
   *seg = segment;
 
+  return;
+}
+
+//***************************************************************
+// print bitmap
+void print_bitmap(void* bitmap_ptr, uint nb_bulk)
+{
+  uint level; 
+  for (level = 0; level < max_level(nb_bulk); ++level)
+    {
+      printf("level: %lu\n", level);
+      uint index;
+      void* level_ptr = get_level_bitmap_ptr(bitmap_ptr, nb_bulk, level);
+      uint index_max = get_level_max_index(nb_bulk, level);
+      printf("max index[%lu] := %lu\n", level, index_max);
+      for (index = 0; index <= index_max; ++index)
+	printf("bm[%lu] := %s\n", index, byte_to_binary(*(uint*)(level_ptr + index*ptr_size_byte)));
+
+    }
   return;
 }
 
@@ -1159,7 +1204,7 @@ push(O); }
 }
  */
 
-// markandpush
+// markandpush a given bulk
 void markAndPush(void* data, void** stacktop)
 {
   // first grab all info of the data
@@ -1205,25 +1250,95 @@ void markAndPush(void* data, void** stacktop)
 
 }
 
-
-
-//***************************************************************
-// print bitmap
-void print_bitmap(void* bitmap_ptr, uint nb_bulk)
+// markandpush a given bulk (same as before, but their the bulk is pointed by a bitptr)
+void markAndPushBitPtr(void* data_ptr, void* alloc_bitmap_ptr, void* twork_ptr, uint nb_bulk, uint bulk_size, bm_index index, bm_mask mask, void** stacktop)
 {
-  uint level; 
-  for (level = 0; level < max_level(nb_bulk); ++level)
+
+  // not a valid mask
+  if (mask == 0)
+    return;
+
+  // we test if root is set
+  if (!isMarked(alloc_bitmap_ptr, index, mask))
     {
-      printf("level: %lu\n", level);
-      uint index;
-      void* level_ptr = get_level_bitmap_ptr(bitmap_ptr, nb_bulk, level);
-      uint index_max = get_level_max_index(nb_bulk, level);
-      printf("max index[%lu] := %lu\n", level, index_max);
-      for (index = 0; index <= index_max; ++index)
-	printf("bm[%lu] := %s\n", index, byte_to_binary(*(uint*)(level_ptr + index*ptr_size_byte)));
+      // no: we need to set it
+      setBitAnd(alloc_bitmap_ptr, index, mask, nb_bulk, 0);
+
+      // and push the data
+      // for that we grab the twork pointer of the data
+      void* tworkptr = twork_ptr + bitPtrToIndex(index, mask)*ptr_size_byte;
+
+      // we store their the last stacktop
+      *(void**)(tworkptr) = *stacktop;
+
+      // and the next stacktop is the current object
+      *stacktop = blockAddress(data_ptr, index, mask, bulk_size);
 
     }
+
   return;
+
+}
+
+// tracingliveobjects of a heap
+void tracingHeapLiveObjects(heap* h)
+{
+  // the stack pointer (initially NULL)
+  void* stackp = NULL;
+
+  uint nb_bulk = h->nb_bulk;
+  uint bulk_size = h->bulk_size;
+
+  // we look for all object marked as root in the heap
+  // first we traverse all the segments
+  void* segment = h->segment_start;
+  while (segment != NULL)
+    {
+      printf("tracing segment: %p\n", segment);
+
+      // we traverse the segment root bulk
+      bm_index index = 0;
+      bm_mask mask = 1;
+      
+      void* root_bitmap_ptr = get_root_bitmap_ptr(segment, nb_bulk);
+      void* alloc_bitmap_ptr = get_alloc_bitmap_ptr(segment);
+      void* data_ptr = get_bulk_ptr(segment, nb_bulk);
+      void* twork_ptr = get_segment_twork_ptr(segment, nb_bulk, bulk_size);
+
+      //print_bitmap(root_bitmap_ptr, nb_bulk);
+
+      // if the bit is marked for root then we markandpush it
+      if (isMarked(root_bitmap_ptr, index, mask))
+	markAndPushBitPtr(data_ptr, alloc_bitmap_ptr, twork_ptr, nb_bulk, bulk_size, index, mask, &stackp);
+
+      findNextAllocatedBlock(root_bitmap_ptr, &index, &mask, nb_bulk, 0);
+
+      // while we find marked bit
+      while (mask != 0)
+	{
+	  //printf("start: (%lu, %s)\n", index, byte_to_binary(mask));
+
+	  // markit
+	  markAndPushBitPtr(data_ptr, alloc_bitmap_ptr, twork_ptr, nb_bulk, bulk_size, index, mask, &stackp);
+
+	  // and find next
+	  findNextAllocatedBlock(root_bitmap_ptr, &index, &mask, nb_bulk, 0);
+
+	  //printf("next: (%lu, %s)\n", index, byte_to_binary(mask));
+
+	} 
+
+      // go to nextblock
+      segment = get_segment_next(segment);
+
+    }
+
+  // then pop all marked object and push their children
+  //TODO
+
+  // finished
+  return;
+
 }
 
 
@@ -1373,6 +1488,9 @@ char gc_init(uint n){
   printf("nb alloc := %lu (== %lu)\n", count, h.nb_bulk);
   print_list(h.segment_start, h.segment_end);
 
+  // call tracing
+  tracingHeapLiveObjects(&h);
+
   return -1;
 }
 
@@ -1381,7 +1499,7 @@ char gc_init(uint n){
 #ifdef WITHMAIN
 int main(int argc, char** argv, char** arge)
 {
-  gc_init(21);
+  gc_init(20);
   
   return 0;
 }
