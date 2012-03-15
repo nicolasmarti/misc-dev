@@ -1370,7 +1370,7 @@ void traceHeapLiveObjects(heap* h)
   
   while(stackp != NULL)
     {
-      printf("stackp := %p\n", stackp);
+      //printf("stackp := %p\n", stackp);
 
       // we pop the value
 
@@ -1807,13 +1807,22 @@ int main(int argc, char** argv, char** arge)
   // something stupid: allocated until you can't (increasing wanted size)
   uint size = 1;
   void* data;
-  while ((data = alloc(size,false)) != NULL)
+  while ((data = alloc(size, false)) != NULL)
     {
       //printf("size := %lu, data := %p\n", size, data);
       ++size;
     }
   
   printf("max size := %lu", size);
+
+  print_heaps();  
+
+  alloc(--size, true);
+  alloc(size, true);
+  alloc(size, true);
+  alloc(size, true);
+  alloc(size, true);
+  alloc(size, true);
 
   print_heaps();  
 
