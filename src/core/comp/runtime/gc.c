@@ -1359,7 +1359,7 @@ void traceHeapLiveObjects(heap* h)
 
 	} 
 
-      printf("tracing segment: %p (%lu)\n", segment, count);
+      //printf("tracing segment: %p (%lu)\n", segment, count);
 
       // go to nextblock
       segment = get_segment_next(segment);
@@ -1493,6 +1493,9 @@ void bitmapMarkingGC()
 // allocation function (the bool means that it is a root)
 void* alloc(uint size, bool root)
 {
+  if (size == 0)
+    return NULL;
+
   // first grab the cell floor of log 2 of size: this is the index in the heap array
   // size is in byte, while the bulk_size are in sizeof(void*) 
   uint n = cell_log2(size/ptr_size_byte);
@@ -1597,6 +1600,20 @@ void set_root(void* data)
 
 }
 
+/*********************************************/
+void print_heaps()
+{
+  uint i;
+  for (i = 0; i <= max_bulk_size; ++i)
+    {
+      printf("-------------------------\n");
+      printf("heap (nb_bulk := %lu, bulk_size := %lu):=\n", heaps[i].nb_bulk, heaps[i].bulk_size);
+      print_list(heaps[i].segment_start, heaps[i].segment_end, heaps[i].nb_bulk);
+      printf("-------------------------\n\n");
+
+    }
+  
+}
 
 /******************************************************************************************/
 
@@ -1657,7 +1674,7 @@ char gc_init(uint n){
   while (nb_bulk_ub(segment_size_ub, 1 << max_bulk_size) == 0)
     (--max_bulk_size);
   
-  printf("max_bulk_size = %lu\n", max_bulk_size);
+  printf("max_bulk_size = %lu (== max alloc := %lu bytes)\n", max_bulk_size, (1<<max_bulk_size)*ptr_size_byte);
 
   //allocate the heap
   heaps = (heap*)(malloc(sizeof(heap) * (max_bulk_size+1)));
@@ -1785,8 +1802,21 @@ char gc_init(uint n){
 #ifdef WITHMAIN
 int main(int argc, char** argv, char** arge)
 {
-  gc_init(20);
+  gc_init(12);
+
+  // something stupid: allocated until you can't (increasing wanted size)
+  uint size = 1;
+  void* data;
+  while ((data = alloc(size,false)) != NULL)
+    {
+      //printf("size := %lu, data := %p\n", size, data);
+      ++size;
+    }
   
+  printf("max size := %lu", size);
+
+  print_heaps();  
+
   return 0;
 }
 #endif
