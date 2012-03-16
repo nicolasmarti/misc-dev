@@ -172,7 +172,12 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         for d in self.m_locals:
             if not d in self.name2iter.keys():
                 # a new local var
-                iter = self.treestore.append(None, [d])
+                name = str(d)
+                try:
+                    name = name + " := " + self.m_locals.getformula(d)[1:]
+                except:
+                    None
+                iter = self.treestore.append(None, [name])
                 self.name2iter[d] = iter
 
         for d in self.name2iter.keys():
