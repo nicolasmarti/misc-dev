@@ -1797,8 +1797,6 @@ char gc_init(uint n){
   return -1;
 }
 
-#define WITHMAIN
-
 #ifdef WITHMAIN
 int main(int argc, char** argv, char** arge)
 {
