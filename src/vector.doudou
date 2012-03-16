@@ -1,0 +1,9 @@
+nat :: Type := | O :: nat | S :: nat -> nat
+
+vector (A :: Type) :: nat -> Type :=
+| [[]] :: vector A O
+| (:) : right, 30 :: A -> {n :: nat} -> vector A n -> vector A (S n)
+
+map :: {A B:: Type} -> {n :: nat} -> (A -> B) -> vector A n -> vector B n
+map f [] := []
+map f (hd : tl) := (f hd) : map f tl

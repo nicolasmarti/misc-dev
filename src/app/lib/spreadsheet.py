@@ -415,7 +415,3 @@ if __name__ == '__main__':
   ss5 = SpreadSheet(file = open('ss4.pkl', 'rb'))
 
   print ss5
-
-  ss6 = SpreadSheet(file = open('ss.pkl', 'rb'))
-
-  print ss6

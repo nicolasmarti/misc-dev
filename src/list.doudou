@@ -1,0 +1,17 @@
+list (A:: Type) :: Type :=
+| [[]] :: list A
+| (:) : right, 100 :: A -> list A -> list A
+
+(*) : left, 200 (A B:: Type) :: Type :=
+| (,) : left, 200 :: A -> B -> A * B
+
+fst :: {A B :: Type} -> A * B -> A
+fst (x, _) := x
+
+snd :: {A B :: Type} -> A * B -> B
+snd (_, y) := y
+
+map :: {A B :: Type} -> (A -> B) -> list A -> list B
+map f [] := []
+map f (hd:tl) := (f hd):map f tl
+
