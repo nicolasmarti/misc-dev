@@ -20,50 +20,7 @@ let int2string (i: int) (size: int) : string =
     ) else s
 ;;
 
-open Spotlib.Spot
-open Planck;;
-
-(* Stream of chars with buffering and memoization *)
-module Stream = struct
-
-  (* The configuration of the stream *)    
-  module Base = struct
-
-    (* Stream elements *)
-    type elem = char (* It is a char stream *)
-    let show_elem = Printf.sprintf "%C" (* How to pretty print the element *)
-    let equal_elem (x : char) y = x = y
-
-    (* Stream attributes *)
-    type attr = Sbuffer.buf (* Stream elements carry internal buffers *)
-    let default_attr = Sbuffer.default_buf
-
-    (* Stream positions *)
-    module Pos = Position.File (* Type of the element position *)
-    let position_of_attr attr = Sbuffer.position_of_buf attr (* How to obtain the position from attr *)
-  end
-
-  module Str = Stream.Make(Base) (* Build the stream *)
-  include Str
-
-  (* Extend Str with buffering *)
-  include Sbuffer.Extend(struct
-    include Str
-    let create_attr buf = buf (* How to create an attribute from a buffer *)
-    let buf st = attr st (* How to obtain the buffer of a stream *)
-  end)
-
-end
-
-module Parser = struct
-
-  module Base = Pbase.Make(Stream) (* Base parser *)
-  include Base
-
-  include Pbuffer.Extend(Stream)(Base) (* Extend Base with parser operators for buffered streams *)
-end    
-
-open Parser (* open Parser namespace *)
+open Parser;;
 
 (*
   parser for format
