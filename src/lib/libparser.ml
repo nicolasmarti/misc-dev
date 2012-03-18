@@ -181,6 +181,17 @@ let mayberule (r: 'a parsingrule) (pb:parserbuffer) : 'a option =
       None
 ;;
 
+(* one of *)
+let rec one_of (l: string list): string parsingrule =
+  fun pb ->
+    match l with
+      | [] -> raise NoMatch
+      | hd::tl ->
+	try
+	  applylexingrule (regexp_string hd, (fun s -> s)) pb
+	with
+	  | NoMatch -> one_of tl pb
+;;
 
 (* we try some parsing rule, but without changing the pointer to the parsing buffer or raising NoMAtch exception *)
 let predictrule (r: 'a parsingrule) (pb:parserbuffer) : ('a * int) option =
