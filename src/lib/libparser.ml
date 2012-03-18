@@ -373,6 +373,16 @@ let many2 (r: 'a parsingrule) (pb: parserbuffer) : 'a list =
       )
 ;;
 
+(* parse any character (except newline, and the token in the list) *)
+let any_except : string list -> string parsingrule = 
+  fun l pb ->
+    let s = many (fun pb ->
+      let () = notpl l pb in
+      applylexingrule (regexp ".", fun (s:string) -> s) pb
+    ) pb in
+    String.concat "" s
+;;
+
 (* do an until NoMatch *)
 let rec fixpoint (p: 'a -> 'a parsingrule) (a: 'a) (pb: parserbuffer) : 'a =
   try 

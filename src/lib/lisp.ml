@@ -1283,36 +1283,28 @@ open Str;;
 
 let reserved_keywords = []
 
-let name_parser : name parsingrule = applylexingrule (regexp "[a-zA-Z][a-zA-Z0-9]*", 
-						      fun (s:string) -> 
-							if List.mem s reserved_keywords then raise NoMatch else s
+let parse_name : name parsingrule = applylexingrule (regexp "[a-zA-Z][a-zA-Z0-9]*", 
+						     fun (s:string) -> 
+						       if List.mem s reserved_keywords then raise NoMatch else s
 )
 ;;
 
+let blank = whitespaces;;
+
+let parse_string : string parsingrule =
+  any_except ["\""]
+;;
+
+let parse_comment : unit parsingrule =
+  fun pb ->
+    let () = whitespaces pb in
+    let () = word ";" pb in
+    let _ = any_except [] pb in
+    let () = whitespaces pb in
+    ()
+;;
+
 (*
-let blank = ignore (one_of [' '; '\t'; '\n'; '\r'])
-
-let parse_name st = begin
-  
-  matched (?+ (tokenp (function | '(' | ')' | '"' | ';' | ' ' | '\t' | '\n' | '\r' | '\'' -> false | _ -> true) <?> "var")) >>= fun s2 -> 
-  return s2
-    
-end st
-
-let parse_string st = begin
-    (matched (?+ (tokenp (function '"' -> false | _ -> true) <?> "string")) >>= fun s -> 
-     return s
-    )    
-end st
-
-let parse_comment st = begin
-  (?* blank) >>= fun _ -> 
-  token ';' >>= fun _ -> 
-  (?+ (tokenp (function '\n' -> false | '\r' -> false | c -> true) <?> "comment") >>= fun _ -> 
-  (?* blank) >>= fun _ -> 
-   return ()
-  )    
-end st
 
 let rec parse_expr st = begin
   withPos (
