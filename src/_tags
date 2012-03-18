@@ -8,9 +8,10 @@
 <core/interp/interp.{ml,byte,native}>: pkg_pycaml
 <core/app/mymms.{ml,byte,native}>: pkg_str, pkg_pycaml, g++, use_llvm, use_llvm_analysis, use_llvm_executionengine, use_llvm_target, use_llvm_scalar_opts, use_bindings
 
-
 <app/lib/ibtws>: include
 <tests/testibtws.{ml,byte,native}>: pkg_unix, pkg_threads, pkg_str
+
+<tests/testlisp.{ml,byte,native}>: pkg_str, pkg_unix
 
 <tests/testmllvm.{ml,byte,native}>: g++, use_llvm, use_llvm_analysis, use_llvm_executionengine, use_llvm_target, use_llvm_scalar_opts, use_bindings
 
