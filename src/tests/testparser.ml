@@ -20,7 +20,7 @@ open Stream;;
 open Printf;;
 open Str;;
 open Buffer;;
-open Parser;;
+open Libparser;;
 
 
 (*****************************************************)
@@ -80,7 +80,7 @@ Hashtbl.add infixes "*" (4, RightAssoc, fun _ x y -> Mult (x, y));;
 Hashtbl.add infixes "/" (4, RightAssoc, fun _ x y -> Div (x, y));;
 
 
-let valparser : expr Parser.parsingrule = 
+let valparser : expr Libparser.parsingrule = 
   (tryrule ((fun _ x -> Val x) |> (spaces) >> (applylexingrule parseintrule)))
   <|> (tryrule ((fun _ x -> Val x) |> (spaces) >> (applylexingrule parseintrule)))
 
