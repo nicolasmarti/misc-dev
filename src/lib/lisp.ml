@@ -1289,12 +1289,12 @@ let parse_name : name parsingrule = applylexingrule (regexp "[a-zA-Z][-a-zA-Z0-9
 )
 ;;
 
-let symbols = ["string="; "string<"; "+"; "1+"; "="; "<"; ">"; "<="; ">="]
+let symbols = ["string="; "string<"; "+"; "*"; "1+"; "1-"; "="; "<"; ">"; "<="; ">="]
 ;;
 
 let parse_symbol : string parsingrule =
   foldp (List.map (fun x -> 
-    tryrule (words x)
+    tryrule (words x) <!> "symbol"
   ) symbols)
 ;;
 
@@ -1330,35 +1330,36 @@ let parse_comment : unit parsingrule =
     fun pb ->
       let () = whitespaces pb in
       let () = word ";" pb in
-      let s = any_except [] pb in
+      let _ = any_except_nl [] pb in
       let () = whitespaces pb in
       ()
   )
 ;;
 
-let rec parse_expr : expr parsingrule = 
-  fun pb -> (    
+let rec parse_expr ?(verbose: bool = false) : expr parsingrule = 
+  fun pb -> 
+    let e = ((
     tryrule (((fun pb ->
       let () = (orrule parse_comment whitespaces) pb in 
       let s, (startp, endp) = with_pos parse_symbol pb in
       let () = (orrule parse_comment whitespaces) pb in 
-      SrcInfo (Name s, (startp, endp))))
+      SrcInfo (Name s, (startp, endp))) <!> "symbol")
     ) <|> tryrule (((fun pb ->
       let () = (orrule parse_comment whitespaces) pb in 
       let s, (startp, endp) = with_pos parse_name pb in
       let () = (orrule parse_comment whitespaces) pb in 
       SrcInfo ((if s = "nil" then List [] else Name s), 
-	       (startp, endp))))
+	       (startp, endp))) <!> "name")
     ) <|> tryrule (((fun pb ->
       let () = (orrule parse_comment whitespaces) pb in 
       let f, (startp, endp) = with_pos float_parser pb in
       let () = (orrule parse_comment whitespaces) pb in 
-      SrcInfo (Float f, (startp, endp))))
+      SrcInfo (Float f, (startp, endp))) <!> "float")
     ) <|> tryrule (((fun pb ->
       let () = (orrule parse_comment whitespaces) pb in 
       let i, (startp, endp) = with_pos int_parser pb in
       let () = (orrule parse_comment whitespaces) pb in 
-      SrcInfo (Int i, (startp, endp))))
+      SrcInfo (Int i, (startp, endp))) <!> "int")
     ) <|> tryrule (((fun pb ->
       let () = (orrule parse_comment whitespaces) pb in 
       let s, (startp, endp) = with_pos (fun pb ->
@@ -1368,7 +1369,7 @@ let rec parse_expr : expr parsingrule =
       s
       ) pb in
       let () = (orrule parse_comment whitespaces) pb in 
-      SrcInfo (String s, (startp, endp))))
+      SrcInfo (String s, (startp, endp))) <!> "string")
     ) <|> tryrule (((fun pb ->
       let () = (orrule parse_comment whitespaces) pb in 
       let e, (startp, endp) = with_pos (fun pb ->
@@ -1377,7 +1378,7 @@ let rec parse_expr : expr parsingrule =
 	e
       ) pb in
       let () = (orrule parse_comment whitespaces) pb in 
-      SrcInfo (Quoted e, (startp, endp))))
+      SrcInfo (Quoted e, (startp, endp))) <!> "quote")
     ) <|> tryrule (((fun pb ->
       let () = (orrule parse_comment whitespaces) pb in 
       let l, (startp, endp) = with_pos (fun pb ->
@@ -1387,9 +1388,11 @@ let rec parse_expr : expr parsingrule =
 	l
       ) pb in
       let () = (orrule parse_comment whitespaces) pb in 
-      SrcInfo (List l, (startp, endp))))
+      SrcInfo (List l, (startp, endp))) <!> "list")
     )
-  ) pb
+  ) <!> "expr") pb in
+    if verbose then printbox (token2box (expr2token e) 400 2);
+    e
 ;;
 
 (******************************************************************************)
@@ -1409,17 +1412,22 @@ let interp_expr ?(verbose: bool = true) ctxt expr =
 	raise Pervasives.Exit
   ) with
     | NoMatch -> 
-      raise (Failure (String.concat "\n" ["parsing error in:"; Buffer.contents pb.bufferstr; errors2string pb]))
+      printf "buffer size:=%n\n" (String.length (Buffer.contents pb.bufferstr));
+      printf "buffer content:=%s\n" (Buffer.contents pb.bufferstr);
+      printf "error:= %s\n" (markerror pb);
+      raise Pervasives.Exit
 ;;
 
-let interp_exprs ?(verbose: bool = false) ctxt expr = 
+let interp_exprs ?(verbose: bool = true) ctxt expr = 
   let lines = stream_of_string expr in
   let pb = build_parserbuffer lines in
   try (
     let es = many1 parse_expr pb in
       let res' = List.map (fun hd -> 
 	try (
-	  eval hd ctxt
+	  let res = eval hd ctxt in
+	  if verbose then printbox (token2box (expr2token res) 400 2);
+	  res
 	) with
 	  | LispException err ->
 	    printf "%s in\n%s\n" (box2string (token2box (execException2box err) 400 2)) (box2string (token2box (expr2token hd) 400 2));
@@ -1428,5 +1436,8 @@ let interp_exprs ?(verbose: bool = false) ctxt expr =
       res'
   ) with
     | NoMatch -> 
-      raise (Failure (String.concat "\n" ["parsing error in:"; Buffer.contents pb.bufferstr; errors2string pb]))
+      printf "buffer size:=%n\n" (String.length (Buffer.contents pb.bufferstr));
+      printf "buffer content:=%s\n" (Buffer.contents pb.bufferstr);
+      printf "error:= %s\n" (markerror pb);
+      raise Pervasives.Exit
 ;;

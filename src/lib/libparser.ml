@@ -386,11 +386,20 @@ let many2 (r: 'a parsingrule) (pb: parserbuffer) : 'a list =
 ;;
 
 (* parse any character (except newline, and the token in the list) *)
-let any_except : string list -> string parsingrule = 
+let any_except_nl : string list -> string parsingrule = 
   fun l pb ->
     let s = many (fun pb ->
       let () = notpl l pb in
       applylexingrule (regexp ".", fun (s:string) -> s) pb
+    ) pb in
+    String.concat "" s
+;;
+
+let any_except : string list -> string parsingrule = 
+  fun l pb ->
+    let s = many (fun pb ->
+      let () = notpl l pb in
+      applylexingrule (regexp ".\\|[\r \n]", fun (s:string) -> s) pb
     ) pb in
     String.concat "" s
 ;;
@@ -493,7 +502,13 @@ let error (p: 'a parsingrule) (s: string) : 'a parsingrule =
     with
       | NoMatch -> 
         let errend = pb.beginpointer in
+	if (savebegin = errend) then (
+	  let _ = applylexingrule (regexp ".", fun (s:string) -> s) pb in
+	  ()
+	);
+        let errend = pb.beginpointer in
         pb.error <- ((pos_coo pb savebegin),(pos_coo pb errend), (savebegin, errend), s)::pb.error;
+	pb.beginpointer <- savebegin;
         raise NoMatch;
 ;;
 
@@ -519,7 +534,10 @@ let rec errors2string (pb: parserbuffer) : string =
   try (
   let errors = 
     let cmp (e1, _, _, _) (e2, _, _, _) =
-      (snd e2) - (snd e1) in
+      if (fst e2) > (fst e1) then 1 else 
+	if (fst e2) < (fst e1) then -1 else
+	  (snd e2) - (snd e1)
+	in
     List.sort cmp pb.error
   in
   String.concat "\n" (
@@ -540,7 +558,10 @@ let rec errors2string (pb: parserbuffer) : string =
 let markerror (pb: parserbuffer) : string =
   let errors = 
     let cmp (e1, _, _, _) (e2, _, _, _) =
-      (snd e2) - (snd e1) in
+      if (fst e2) > (fst e1) then 1 else 
+	if (fst e2) < (fst e1) then -1 else
+	  (snd e2) - (snd e1)
+	in
     List.sort cmp pb.error
   in
   match errors with

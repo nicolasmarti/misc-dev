@@ -102,7 +102,6 @@ let _ = interp_exprs ctxt"
        (dotimes (number 3 value)
          (setq value (cons number value))))
 ";;
-
 let _ = interp_exprs ctxt"
 (defun triangle-using-dotimes (number-of-rows)
    \"Using dotimes, add up the number of pebbles in a triangle.\"
@@ -127,6 +126,7 @@ let _ = interp_exprs ctxt"
      (print-elements-recursively animals)
 ";;
 
+
 let _ = interp_exprs ctxt"
 (defun triangle-recursively (number)
        \"Return the sum of the numbers 1 through NUMBER inclusive.
@@ -139,6 +139,7 @@ let _ = interp_exprs ctxt"
      
      (triangle-recursively 7)
 ";;
+
 
 let _ = interp_exprs ctxt"
 (defun square-each (numbers-list)
