@@ -380,10 +380,10 @@ and parse_term_lvl1 (defs: defs) (leftmost: (int * int)) (pb: parserbuffer) : te
     let head = parse_term_lvl2 defs leftmost pb in    
     let () = whitespaces pb in
     (* then we parse the arguments *)
-    let args = separatedBy (
+    let args = many (
       fun pb ->
 	parse_arguments defs leftmost pb
-    ) whitespaces pb in
+    ) pb in
     let endpos = cur_pos pb in
     match args with
       | [] -> head
@@ -477,10 +477,10 @@ and parse_pattern_lvl1 (defs: defs) (leftmost: (int * int)) : pattern parsingrul
     let () = whitespaces pb in
     (* then we parse the arguments *)
     let args = List.flatten (
-      separatedBy (
+      many (
 	fun pb ->
 	  parse_pattern_arguments defs leftmost pb
-      ) whitespaces pb) in
+      ) pb) in
     let endpos = cur_pos pb in
     match args with
       | [] -> PCste (s, pos)

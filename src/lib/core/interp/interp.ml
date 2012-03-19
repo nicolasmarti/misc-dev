@@ -264,7 +264,7 @@ let _ =
 	    with
 	      (* TODO: return proper python exception *)
 	      | NoMatch -> 
-		raise (Failure (String.concat "\n" ["parsing error in:"; Buffer.contents pb.bufferstr; errors2string pb]))
+		raise (Failure (String.concat "\n" ["parsing error in:"; Buffer.contents pb.bufferstr; markerror pb]))
 	      | DoudouException err -> 
 	      (* we restore the context and defs *)
 		ctxt := saved_ctxt;
@@ -299,7 +299,7 @@ let _ =
 	with
 	  (* TODO: return proper python exception *)
 	  | NoMatch -> 
-	    raise (Failure (String.concat "\n" ["parsing error in:"; Buffer.contents pb.bufferstr; errors2string pb]))
+	    raise (Failure (String.concat "\n" ["parsing error in:"; Buffer.contents pb.bufferstr; markerror pb]))
 	  | DoudouException err -> 
 	    (* we restore the context and defs *)
 	    ctxt := saved_ctxt;

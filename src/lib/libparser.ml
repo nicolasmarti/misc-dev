@@ -427,6 +427,18 @@ let rec separatedBy (elem: 'a parsingrule) (sep: 'b parsingrule) (pb: parserbuff
   hd :: tl
 ;; 
 
+(*
+let rec separatedBy (elem: 'a parsingrule) (sep: 'b parsingrule) (pb: parserbuffer) : 'a list =
+  (
+    (tryrule
+       (
+	 ((fun x l -> x::l) |> 
+	     elem) >> (separatedBy elem sep)
+       )
+    ) <|> (parsecste [])
+  ) pb
+;;
+*)
 (* fold on parser, they are all tried, and it fails if none hold *)
 let foldp (l: ('a parsingrule) list) : 'a parsingrule =
   (List.fold_left (
