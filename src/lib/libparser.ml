@@ -290,6 +290,11 @@ let keyword (s: string) (v: 'a) : 'a parsingrule =
 
 let word (s: string) : unit parsingrule =
   (applylexingrule (regexp_string s, (fun _ -> ())))
+;;
+
+let words (s: string) : string parsingrule =
+  (applylexingrule (regexp_string s, (fun s -> s)))
+;;
 
 let paren (p: 'a parsingrule) : 'a parsingrule =
   spaces >>> (

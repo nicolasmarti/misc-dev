@@ -1289,6 +1289,34 @@ let parse_name : name parsingrule = applylexingrule (regexp "[a-zA-Z][a-zA-Z0-9]
 )
 ;;
 
+let symbols = ["\\+"; "\\*"; "-"; ":"; "|"; "\\&"; "="; "~"; "<"; ">"]
+;;
+
+let parse_symbol : string parsingrule =
+  foldp (List.map (fun x -> words x) symbols)
+;;
+
+let float_parser : float parsingrule =
+  applylexingrule (regexp "[0-9]+.[0-9]*", 
+		   fun (s:string) -> 
+		     try
+		       float_of_string s
+		     with
+		       | _ -> printf "cannot make a float of %s." s; raise NoMatch
+  )
+;;
+
+let int_parser : int parsingrule =
+  applylexingrule (regexp "[0-9]+", 
+		   fun (s:string) -> 
+		     try
+		       int_of_string s
+		     with
+		       | _ -> printf "cannot make a float of %s." s; raise NoMatch
+  )
+;;
+
+
 let blank = whitespaces;;
 
 let parse_string : string parsingrule =
@@ -1302,6 +1330,62 @@ let parse_comment : unit parsingrule =
     let _ = any_except [] pb in
     let () = whitespaces pb in
     ()
+;;
+
+let rec parse_expr : expr parsingrule = 
+  fun pb -> (    
+    tryrule (fun pb ->
+      let () = (orrule parse_comment whitespaces) pb in 
+      let s, (startp, endp) = with_pos parse_name pb in
+      let () = (orrule parse_comment whitespaces) pb in 
+      SrcInfo ((if s = "nil" then List [] else Name s), 
+	       (startp, endp))
+    ) <|> tryrule (fun pb ->
+      let () = (orrule parse_comment whitespaces) pb in 
+      let s, (startp, endp) = with_pos parse_symbol pb in
+      let () = (orrule parse_comment whitespaces) pb in 
+      SrcInfo (Name s, (startp, endp))
+    ) <|>tryrule (fun pb ->
+      let () = (orrule parse_comment whitespaces) pb in 
+      let i, (startp, endp) = with_pos int_parser pb in
+      let () = (orrule parse_comment whitespaces) pb in 
+      SrcInfo (Int i, (startp, endp))
+    ) <|> tryrule (fun pb ->
+      let () = (orrule parse_comment whitespaces) pb in 
+      let f, (startp, endp) = with_pos float_parser pb in
+      let () = (orrule parse_comment whitespaces) pb in 
+      SrcInfo (Float f, (startp, endp))
+    ) <|> tryrule (fun pb ->
+      let () = (orrule parse_comment whitespaces) pb in 
+      let s, (startp, endp) = with_pos (fun pb ->
+      let () = word "\"" pb in
+      let s = parse_string pb in
+      let () = word "\"" pb in
+      s
+      ) pb in
+      let () = (orrule parse_comment whitespaces) pb in 
+      SrcInfo (String s, (startp, endp))
+    ) <|> tryrule (fun pb ->
+      let () = (orrule parse_comment whitespaces) pb in 
+      let e, (startp, endp) = with_pos (fun pb ->
+	let () = word "'" pb in
+	let e = parse_expr pb in
+	e
+      ) pb in
+      let () = (orrule parse_comment whitespaces) pb in 
+      SrcInfo (Quoted e, (startp, endp))
+    ) <|> tryrule (fun pb ->
+      let () = (orrule parse_comment whitespaces) pb in 
+      let l, (startp, endp) = with_pos (fun pb ->
+	let () = word "(" pb in
+	let l = many parse_expr pb in
+	let () = word ")" pb in
+	l
+      ) pb in
+      let () = (orrule parse_comment whitespaces) pb in 
+      SrcInfo (List l, (startp, endp))
+    )
+  ) pb
 ;;
 
 (*
@@ -1354,7 +1438,16 @@ end st
 (******************************************************************************)
 
 let interp_expr ?(verbose: bool = false) ctxt expr = 
-  printf "interp_expr: not yet implemented (pending parser)\n"
+  let lines = stream_of_string expr in
+  let pb = build_parserbuffer lines in
+  try 
+    let e = parse_expr pb in
+    let res = eval e ctxt in
+    if verbose then printbox (token2box (expr2token res) 400 2);
+    res
+  with
+    | NoMatch -> 
+      raise (Failure (String.concat "\n" ["parsing error in:"; Buffer.contents pb.bufferstr; errors2string pb]))
 ;;
 
 let interp_exprs ?(verbose: bool = false) ctxt expr = 
