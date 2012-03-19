@@ -16,7 +16,7 @@
   Copyright (C) Nicolas Marti
 *)
 
-open Pprinter;;
+open Libpprinter;;
 open Printf;;
 
 let test = 

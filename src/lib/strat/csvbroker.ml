@@ -1,80 +1,43 @@
-open Planck;;
+open Str
+open Libparser
+open Printf
 
-(* Stream of chars with buffering and memoization *)
-module Stream = struct
+let blank = whitespaces
 
-  (* The configuration of the stream *)    
-  module Base = struct
+let rg = regexp "[-a-zA-Z0-9\\.]+";;
 
-    (* Stream elements *)
-    type elem = char (* It is a char stream *)
-    let show_elem = Printf.sprintf "%C" (* How to pretty print the element *)
-    let equal_elem (x : char) y = x = y
+let parse_elt : string parsingrule = applylexingrule (rg, 
+						      fun (s:string) -> 
+                                                        (*printf "parsed: %s\n" s; flush stdout;*)
+						        s
+)
+;;
 
-    (* Stream attributes *)
-    type attr = Sbuffer.buf (* Stream elements carry internal buffers *)
-    let default_attr = Sbuffer.default_buf
 
-    (* Stream positions *)
-    module Pos = Position.File (* Type of the element position *)
-    let position_of_attr attr = Sbuffer.position_of_buf attr (* How to obtain the position from attr *)
-  end
+let parse_line : float parsingrule =
+  fun pb ->
+    let l = separatedBy parse_elt (word ",") pb in
+    match l with
+      | [bdate; bopen; bhigh; blow; bclose; bvolume; badjustclose] ->
+        (*printf "l := [%s]\n" (String.concat ", " l); *)
+        (float_of_string badjustclose)
+      | _ -> printf "l := [%s]\n" (String.concat ", " l); raise NoMatch
+;;
 
-  module Str = Stream.Make(Base) (* Build the stream *)
-  include Str
-
-  (* Extend Str with buffering *)
-  include Sbuffer.Extend(struct
-    include Str
-    let create_attr buf = buf (* How to create an attribute from a buffer *)
-    let buf st = attr st (* How to obtain the buffer of a stream *)
-  end)
-
-end
-
-module Parser = struct
-
-  module Base = Pbase.Make(Stream) (* Base parser *)
-  include Base
-
-  include Pbuffer.Extend(Stream)(Base) (* Extend Base with parser operators for buffered streams *)
-end    
-
-open Parser (* open Parser namespace *)
-
-let blank = ignore (one_of [' '; '\t'; '\n'; '\r'])
-
-let parse_elt st = begin
-  
-  matched (?+ (tokenp (function | '(' | ')' | '"' | ';' | ' ' | ',' | '\t' | '\n' | '\r' | '\'' -> false | _ -> true) <?> "var")) >>= fun s2 -> 
-  return s2
-    
-end st
-
-let parse_line st = begin
-  (list_with_sep 
-     ~sep:(token ',') 
-     parse_elt
-  ) >>= fun [bdate; bopen; bhigh; blow; bclose; bvolume; badjustclose] ->
-  return (float_of_string badjustclose)
-
-end st  
-
-let parse_lines st = begin
-  (list_with_sep 
-     ~sep:(?+ blank) 
-     parse_line
-  )
-end st  
+let parse_lines = 
+  separatedBy parse_line whitespaces
+;;
 
 let parse_csv csv =
-  let stream = Stream.from_string ~filename:"stdin" csv in
-  match parse_lines stream with
-    | Result.Ok (res, _) -> (
-      res
-    )
-    | Result.Error (pos, s) ->
-      Format.eprintf "%s\n%a: syntax error: %s@." csv Position.File.format pos s;      
+  let lines = stream_of_string csv in
+  let pb = build_parserbuffer lines in
+  try (
+    let lines = parse_lines pb in
+    printf "parsed %n lines\n" (List.length lines); flush stdout;
+    lines
+  ) with
+    | NoMatch -> 
+      printf "parsing error:=\n%s\n" (markerror pb);
       raise Pervasives.Exit
 ;;
 

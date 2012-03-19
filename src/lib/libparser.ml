@@ -418,14 +418,13 @@ let (|>) v p = (parsecste v) >> p
 ;;
 
 let rec separatedBy (elem: 'a parsingrule) (sep: 'b parsingrule) (pb: parserbuffer) : 'a list =
-  (
-    (tryrule
-       (
-	 ((fun x l -> x::l) |> 
-	     elem) >> (separatedBy elem sep)
-       )
-    ) <|> (parsecste [])
-  ) pb
+  let hd = elem pb in
+  let tl = try (
+    let _ = sep pb in
+    separatedBy elem sep pb
+  ) with
+    | NoMatch -> [] in
+  hd :: tl
 ;; 
 
 (* fold on parser, they are all tried, and it fails if none hold *)

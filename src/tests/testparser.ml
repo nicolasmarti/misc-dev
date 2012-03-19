@@ -16,10 +16,8 @@
   Copyright (C) Nicolas Marti
 *)
 
-open Stream;;
 open Printf;;
 open Str;;
-open Buffer;;
 open Libparser;;
 
 
