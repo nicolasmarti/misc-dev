@@ -1283,21 +1283,23 @@ open Str;;
 
 let reserved_keywords = []
 
-let parse_name : name parsingrule = applylexingrule (regexp "[a-zA-Z][a-zA-Z0-9]*", 
+let parse_name : name parsingrule = applylexingrule (regexp "[a-zA-Z][-a-zA-Z0-9]*", 
 						     fun (s:string) -> 
 						       if List.mem s reserved_keywords then raise NoMatch else s
 )
 ;;
 
-let symbols = ["\\+"; "\\*"; "-"; ":"; "|"; "\\&"; "="; "~"; "<"; ">"]
+let symbols = ["string="; "string<"; "+"; "1+"; "="; "<"; ">"; "<="; ">="]
 ;;
 
 let parse_symbol : string parsingrule =
-  foldp (List.map (fun x -> words x) symbols)
+  foldp (List.map (fun x -> 
+    tryrule (words x)
+  ) symbols)
 ;;
 
 let float_parser : float parsingrule =
-  applylexingrule (regexp "[0-9]+.[0-9]*", 
+  applylexingrule (regexp "[0-9]+\\.[0-9]*", 
 		   fun (s:string) -> 
 		     try
 		       float_of_string s
@@ -1324,38 +1326,40 @@ let parse_string : string parsingrule =
 ;;
 
 let parse_comment : unit parsingrule =
-  fun pb ->
-    let () = whitespaces pb in
-    let () = word ";" pb in
-    let _ = any_except [] pb in
-    let () = whitespaces pb in
-    ()
+  tryrule (
+    fun pb ->
+      let () = whitespaces pb in
+      let () = word ";" pb in
+      let s = any_except [] pb in
+      let () = whitespaces pb in
+      ()
+  )
 ;;
 
 let rec parse_expr : expr parsingrule = 
   fun pb -> (    
-    tryrule (fun pb ->
+    tryrule (((fun pb ->
+      let () = (orrule parse_comment whitespaces) pb in 
+      let s, (startp, endp) = with_pos parse_symbol pb in
+      let () = (orrule parse_comment whitespaces) pb in 
+      SrcInfo (Name s, (startp, endp))))
+    ) <|> tryrule (((fun pb ->
       let () = (orrule parse_comment whitespaces) pb in 
       let s, (startp, endp) = with_pos parse_name pb in
       let () = (orrule parse_comment whitespaces) pb in 
       SrcInfo ((if s = "nil" then List [] else Name s), 
-	       (startp, endp))
-    ) <|> tryrule (fun pb ->
-      let () = (orrule parse_comment whitespaces) pb in 
-      let s, (startp, endp) = with_pos parse_symbol pb in
-      let () = (orrule parse_comment whitespaces) pb in 
-      SrcInfo (Name s, (startp, endp))
-    ) <|>tryrule (fun pb ->
-      let () = (orrule parse_comment whitespaces) pb in 
-      let i, (startp, endp) = with_pos int_parser pb in
-      let () = (orrule parse_comment whitespaces) pb in 
-      SrcInfo (Int i, (startp, endp))
-    ) <|> tryrule (fun pb ->
+	       (startp, endp))))
+    ) <|> tryrule (((fun pb ->
       let () = (orrule parse_comment whitespaces) pb in 
       let f, (startp, endp) = with_pos float_parser pb in
       let () = (orrule parse_comment whitespaces) pb in 
-      SrcInfo (Float f, (startp, endp))
-    ) <|> tryrule (fun pb ->
+      SrcInfo (Float f, (startp, endp))))
+    ) <|> tryrule (((fun pb ->
+      let () = (orrule parse_comment whitespaces) pb in 
+      let i, (startp, endp) = with_pos int_parser pb in
+      let () = (orrule parse_comment whitespaces) pb in 
+      SrcInfo (Int i, (startp, endp))))
+    ) <|> tryrule (((fun pb ->
       let () = (orrule parse_comment whitespaces) pb in 
       let s, (startp, endp) = with_pos (fun pb ->
       let () = word "\"" pb in
@@ -1364,17 +1368,17 @@ let rec parse_expr : expr parsingrule =
       s
       ) pb in
       let () = (orrule parse_comment whitespaces) pb in 
-      SrcInfo (String s, (startp, endp))
-    ) <|> tryrule (fun pb ->
+      SrcInfo (String s, (startp, endp))))
+    ) <|> tryrule (((fun pb ->
       let () = (orrule parse_comment whitespaces) pb in 
       let e, (startp, endp) = with_pos (fun pb ->
-	let () = word "'" pb in
+	let () = word "\'" pb in	
 	let e = parse_expr pb in
 	e
       ) pb in
       let () = (orrule parse_comment whitespaces) pb in 
-      SrcInfo (Quoted e, (startp, endp))
-    ) <|> tryrule (fun pb ->
+      SrcInfo (Quoted e, (startp, endp))))
+    ) <|> tryrule (((fun pb ->
       let () = (orrule parse_comment whitespaces) pb in 
       let l, (startp, endp) = with_pos (fun pb ->
 	let () = word "(" pb in
@@ -1383,176 +1387,46 @@ let rec parse_expr : expr parsingrule =
 	l
       ) pb in
       let () = (orrule parse_comment whitespaces) pb in 
-      SrcInfo (List l, (startp, endp))
+      SrcInfo (List l, (startp, endp))))
     )
   ) pb
 ;;
 
-(*
-
-let rec parse_expr st = begin
-  withPos (
-    try_ (parse_name >>= fun s -> 
-	      if s = "nil" then return (List []) else 
-		try return (Int (int_of_string s)) with
-		  | _ -> try return (Float (float_of_string s)) with
-		      | _ -> return (Name s)
-    )
-    <|> try_ (token '"' >>= fun _ -> parse_string >>= fun s -> token '"' >>= fun _ -> return (String s))
-    <|> try_ (token '\'' >>= fun _ -> parse_expr >>= fun e -> return (Quoted e))
-    <|> try_ (token '(' >>= fun _ -> token ')' >>= fun _ -> return (List []))
-    <|> try_ (surrounded 
-		(token '(' >>= fun _ -> ?* (blank <|> parse_comment) >>= fun () -> return ()) 
-		(?* (blank <|> parse_comment) >>= fun () -> token ')') 
-		(list_with_sep 
-		   ~sep:(?+ blank) 
-		   parse_expr
-		) >>= fun l -> return (List l)
-    )	   
-    <|> try_ ((?+ blank) >>= fun _ ->  parse_expr)
-    <|> try_ (parse_comment >>= fun _ -> parse_expr)
-  ) >>= fun (e, startp, endp) ->  
-  return (SrcInfo (e, (startp, endp)))
-
-end st
-;; 
-
-let parse_oneexpr st = begin
-  parse_expr >>= fun expr ->
-  position >>= fun pos ->
-  return (pos.Pos.byte, expr)
-end st
-;;
-
-let parse_exprs st = begin
-  (list_with_sep 
-     ~sep:(?* blank <|> parse_comment)
-     parse_expr
-  ) >>= fun exprs ->
-  position >>= fun pos ->
-  return (pos.Pos.byte, exprs)
-end st
-;;
-*)
-
 (******************************************************************************)
 
-let interp_expr ?(verbose: bool = false) ctxt expr = 
+let interp_expr ?(verbose: bool = true) ctxt expr = 
   let lines = stream_of_string expr in
   let pb = build_parserbuffer lines in
-  try 
+  try (
     let e = parse_expr pb in
-    let res = eval e ctxt in
-    if verbose then printbox (token2box (expr2token res) 400 2);
-    res
-  with
+    try (
+      let res = eval e ctxt in
+      if verbose then printbox (token2box (expr2token res) 400 2);
+      res
+    ) with 
+      | LispException err ->
+	printf "%s in\n'%s'\n%s\n" (box2string (token2box (execException2box err) 400 2)) expr (box2string (token2box (expr2token e) 400 2));
+	raise Pervasives.Exit
+  ) with
     | NoMatch -> 
       raise (Failure (String.concat "\n" ["parsing error in:"; Buffer.contents pb.bufferstr; errors2string pb]))
 ;;
 
 let interp_exprs ?(verbose: bool = false) ctxt expr = 
-  printf "interp_exprs: not yet implemented (pending parser)\n"
+  let lines = stream_of_string expr in
+  let pb = build_parserbuffer lines in
+  try (
+    let es = many1 parse_expr pb in
+      let res' = List.map (fun hd -> 
+	try (
+	  eval hd ctxt
+	) with
+	  | LispException err ->
+	    printf "%s in\n%s\n" (box2string (token2box (execException2box err) 400 2)) (box2string (token2box (expr2token hd) 400 2));
+	    raise Pervasives.Exit	      
+      ) es in
+      res'
+  ) with
+    | NoMatch -> 
+      raise (Failure (String.concat "\n" ["parsing error in:"; Buffer.contents pb.bufferstr; errors2string pb]))
 ;;
-
-
-(*
-let interp_expr ?(verbose: bool = false) ctxt expr = 
-  (*printf "term = '%s'\n" s;*)
-  let stream = Stream.from_string ~filename:"stdin" expr in
-  match parse_oneexpr stream with
-    | Result.Ok ((consume, res), _) -> (
-      let res' = eval res ctxt in
-      if verbose then printbox (token2box (expr2token res') 400 2);
-      (consume, res')
-    )
-    | Result.Error (pos, s) ->
-      Format.eprintf "%s\n%a: syntax error: %s@." expr Position.File.format pos s;      
-      raise (LispException (StringError (String.concat "\n" ["Parsing error:"; s])))
-;;
-
-let interp_exprs ctxt expr = 
-  (*printf "term = '%s'\n" s;*)
-  let stream = Stream.from_string ~filename:"stdin" expr in
-  match parse_exprs stream with
-    | Result.Ok ((consume, res), _) -> (
-      let res' = List.map (fun hd -> eval hd ctxt) res in
-      (consume, res')
-    )
-    | Result.Error (pos, s) ->
-      Format.eprintf "%s\n%a: syntax error: %s@." expr Position.File.format pos s;      
-      raise (LispException (StringError (String.concat "\n" ["Parsing error:"; s])))
-;;
-
-let interp_file ctxt filename = 
-  let ic = Pervasives.open_in filename in
-  let stream = Stream.from_chan ~filename:filename ic in
-  let parse =   
-    parse_exprs >>= fun (_, exprs) ->
-    ?* blank <|> parse_comment >>= fun _ ->
-    eos >>= fun _ ->
-    return exprs in
-  match parse stream with
-    | Result.Ok (res, _) -> (
-      let _ = List.map (fun hd -> 
-	eval hd ctxt
-      ) res in
-      close_in ic
-    )
-    | Result.Error (pos, s) ->
-      Format.eprintf "%s\n%a: syntax error: %s@." filename Position.File.format pos s;      
-      close_in ic;
-      raise (LispException (StringError (String.concat "\n" ["Parsing error:"; s])))
-	
-;;
-
-let interp_stdin ctxt =
-  let finished = ref false in
-  let terms = ref [] in
-  let parse =
-    eos_as_none (parse_oneexpr >>= fun (_, expr) -> return expr) in      
-  while not !finished do
-    ( 
-      printf "mylisp> "; flush Pervasives.stdout;
-      let stream = Stream.from_chan ~filename:"stdin" Pervasives.stdin in
-      match parse stream with
-	| Result.Ok (Some res, _) -> (	  
-	  try (
-	    (* we evaluate the term *)
-	    let res' = eval res ctxt in
-	    (* we save it *)
-	    terms := res::!terms;
-	    (* and show the result *)	    
-	    printf "\nresult:\n";
-	    printbox (token2box (expr2token res') 400 2);
-	    printf "\n";
-	    flush Pervasives.stdout
-	  ) with
-	    | LispException err -> printf "%s\n" (box2string (token2box (execException2box err) 400 2))
-	)
-	| Result.Ok (None, _) -> (
-	  (* we are done *)
-	  (* before leaving the loop, let's save the terms at the end of the file *)
-	  let _ = (
-	    try 
-	      let terms = List.rev !terms in
-	      let oc = open_out "saved-interactive-session.lisp" in
-	      seek_out oc (out_channel_length oc);
-	      let _ = List.map (fun hd -> 
-		output_string oc (box2string (token2box (expr2token hd) 400 2));
-		output_string oc "\n\n"
-	      ) terms in
-	      close_out oc
-	    with
-	      | Sys_error _ -> ()
-	  ) in
-	  printf "\n"; 
-	  finished := true;	  
-	  flush Pervasives.stdout
-	)
-	| Result.Error (pos, s) ->
-	  Format.eprintf "%a: syntax error: %s@." Position.File.format pos s
-    )
-  done
-
-;;
-*)	  

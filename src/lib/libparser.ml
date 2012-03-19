@@ -184,13 +184,16 @@ let mayberule (r: 'a parsingrule) (pb:parserbuffer) : 'a option =
 (* one of *)
 let rec one_of (l: string list): string parsingrule =
   fun pb ->
+    let savebegin = pb.beginpointer in
     match l with
       | [] -> raise NoMatch
       | hd::tl ->
 	try
 	  applylexingrule (regexp_string hd, (fun s -> s)) pb
 	with
-	  | NoMatch -> one_of tl pb
+	  | NoMatch -> 
+	    pb.beginpointer <- savebegin;
+	    one_of tl pb
 ;;
 
 (* we try some parsing rule, but without changing the pointer to the parsing buffer or raising NoMAtch exception *)
@@ -210,10 +213,12 @@ let predictrule (r: 'a parsingrule) (pb:parserbuffer) : ('a * int) option =
 
 (* disjunction of two parsingrules *)
 let orrule (r1: 'a parsingrule) (r2: 'a parsingrule) (pb: parserbuffer) : 'a =
+  let savebegin = pb.beginpointer in
   try 
     r1 pb
   with
     | NoMatch -> 
+      pb.beginpointer <- savebegin;
       r2 pb
 ;;
 
@@ -268,7 +273,7 @@ let spaces : ('a -> 'a) parsingrule =
   fun pb ->
     try    
       (* it seems a miss something ... but what ?? *)
-      applylexingrule (regexp "[' ' '\t' '\r' '\n']*", fun (s:string) -> fun x -> x) pb
+      applylexingrule (regexp "[\t \r \n]*", fun (s:string) -> fun x -> x) pb
     with
       | NoMatch -> fun x -> x      
 ;;
@@ -277,7 +282,9 @@ let whitespaces : unit parsingrule =
   fun pb ->
     try    
       (* it seems a miss something ... but what ?? *)
-      applylexingrule (regexp "[' ' '\t' '\r' '\n']*", fun (s:string) -> ()) pb
+      applylexingrule (regexp "[\t \r \n]*", fun (s:string) -> 
+	(*printf "whitespaces := '%s'\n" s;*)
+	()) pb
     with
       | NoMatch -> ()      
 ;;

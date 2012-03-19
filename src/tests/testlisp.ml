@@ -2,6 +2,8 @@ open Lisp;;
 
 let ctxt = init_ctxt () ;;
 
+let _ = interp_expr ctxt"'x";;
+
 let _ = interp_expr ctxt"(+ 2.3 5 6 2.1)";;
 
 let _ = interp_expr ctxt"
@@ -42,7 +44,9 @@ let _ = interp_expr ctxt"(string= \"aa\" \"aa\")"
 
 let _ = interp_expr ctxt"(string< \"aa\" \"aa\")"
 
+(*
 let _ = interp_expr ctxt"(message \"salut doudou %s %d times !!!!!!\" 'nicolas 3.23)"
+*)
 
 let _ = interp_expr ctxt"(cons 'doudou '(rou))"
 
