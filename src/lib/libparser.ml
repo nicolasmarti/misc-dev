@@ -181,6 +181,20 @@ let mayberule (r: 'a parsingrule) (pb:parserbuffer) : 'a option =
       None
 ;;
 
+(* one of *)
+let rec one_of (l: string list): string parsingrule =
+  fun pb ->
+    let savebegin = pb.beginpointer in
+    match l with
+      | [] -> raise NoMatch
+      | hd::tl ->
+	try
+	  applylexingrule (regexp_string hd, (fun s -> s)) pb
+	with
+	  | NoMatch -> 
+	    pb.beginpointer <- savebegin;
+	    one_of tl pb
+;;
 
 (* we try some parsing rule, but without changing the pointer to the parsing buffer or raising NoMAtch exception *)
 let predictrule (r: 'a parsingrule) (pb:parserbuffer) : ('a * int) option =
@@ -199,10 +213,12 @@ let predictrule (r: 'a parsingrule) (pb:parserbuffer) : ('a * int) option =
 
 (* disjunction of two parsingrules *)
 let orrule (r1: 'a parsingrule) (r2: 'a parsingrule) (pb: parserbuffer) : 'a =
+  let savebegin = pb.beginpointer in
   try 
     r1 pb
   with
     | NoMatch -> 
+      pb.beginpointer <- savebegin;
       r2 pb
 ;;
 
@@ -257,7 +273,7 @@ let spaces : ('a -> 'a) parsingrule =
   fun pb ->
     try    
       (* it seems a miss something ... but what ?? *)
-      applylexingrule (regexp "[' ' '\t' '\r' '\n']*", fun (s:string) -> fun x -> x) pb
+      applylexingrule (regexp "[\t \r \n]*", fun (s:string) -> fun x -> x) pb
     with
       | NoMatch -> fun x -> x      
 ;;
@@ -266,7 +282,9 @@ let whitespaces : unit parsingrule =
   fun pb ->
     try    
       (* it seems a miss something ... but what ?? *)
-      applylexingrule (regexp "[' ' '\t' '\r' '\n']*", fun (s:string) -> ()) pb
+      applylexingrule (regexp "[\t \r \n]*", fun (s:string) -> 
+	(*printf "whitespaces := '%s'\n" s;*)
+	()) pb
     with
       | NoMatch -> ()      
 ;;
@@ -279,6 +297,11 @@ let keyword (s: string) (v: 'a) : 'a parsingrule =
 
 let word (s: string) : unit parsingrule =
   (applylexingrule (regexp_string s, (fun _ -> ())))
+;;
+
+let words (s: string) : string parsingrule =
+  (applylexingrule (regexp_string s, (fun s -> s)))
+;;
 
 let paren (p: 'a parsingrule) : 'a parsingrule =
   spaces >>> (
@@ -360,6 +383,25 @@ let many2 (r: 'a parsingrule) (pb: parserbuffer) : 'a list =
         pb.beginpointer <- savebegin;
         raise NoMatch
       )
+;;
+
+(* parse any character (except newline, and the token in the list) *)
+let any_except_nl : string list -> string parsingrule = 
+  fun l pb ->
+    let s = many (fun pb ->
+      let () = notpl l pb in
+      applylexingrule (regexp ".", fun (s:string) -> s) pb
+    ) pb in
+    String.concat "" s
+;;
+
+let any_except : string list -> string parsingrule = 
+  fun l pb ->
+    let s = many (fun pb ->
+      let () = notpl l pb in
+      applylexingrule (regexp ".\\|[\r \n]", fun (s:string) -> s) pb
+    ) pb in
+    String.concat "" s
 ;;
 
 (* do an until NoMatch *)
@@ -460,7 +502,13 @@ let error (p: 'a parsingrule) (s: string) : 'a parsingrule =
     with
       | NoMatch -> 
         let errend = pb.beginpointer in
+	if (savebegin = errend) then (
+	  let _ = applylexingrule (regexp ".", fun (s:string) -> s) pb in
+	  ()
+	);
+        let errend = pb.beginpointer in
         pb.error <- ((pos_coo pb savebegin),(pos_coo pb errend), (savebegin, errend), s)::pb.error;
+	pb.beginpointer <- savebegin;
         raise NoMatch;
 ;;
 
@@ -486,7 +534,10 @@ let rec errors2string (pb: parserbuffer) : string =
   try (
   let errors = 
     let cmp (e1, _, _, _) (e2, _, _, _) =
-      (snd e2) - (snd e1) in
+      if (fst e2) > (fst e1) then 1 else 
+	if (fst e2) < (fst e1) then -1 else
+	  (snd e2) - (snd e1)
+	in
     List.sort cmp pb.error
   in
   String.concat "\n" (
@@ -507,16 +558,19 @@ let rec errors2string (pb: parserbuffer) : string =
 let markerror (pb: parserbuffer) : string =
   let errors = 
     let cmp (e1, _, _, _) (e2, _, _, _) =
-      (snd e2) - (snd e1) in
+      if (fst e2) > (fst e1) then 1 else 
+	if (fst e2) < (fst e1) then -1 else
+	  (snd e2) - (snd e1)
+	in
     List.sort cmp pb.error
   in
   match errors with
     | [] -> Buffer.contents pb.bufferstr
     | ((b1,e1), (b2, e2), (b,e), s)::_ ->
-      (*let s1 = Buffer.sub pb.bufferstr 0 b in*)
+      let s1 = Buffer.sub pb.bufferstr 0 b in
       let se = Buffer.sub pb.bufferstr b (e - b) in
-      (* let s2 = Buffer.sub pb.bufferstr (e+1) (Buffer.length pb.bufferstr - e - 1) in*)
-      String.concat "" ["\""; se; "\""; "\n"; 
+      let s2 = Buffer.sub pb.bufferstr (e+1) (Buffer.length pb.bufferstr - e - 1) in
+      String.concat "" [s1; " >>> "; se; " <<< "; s2; "\n"; 
                         string_of_int b1; ":"; string_of_int e1;"-";
                         string_of_int b2; ":"; string_of_int e2;" = ";
                         s]

@@ -20,7 +20,7 @@ let int2string (i: int) (size: int) : string =
     ) else s
 ;;
 
-open Parser;;
+open Libparser;;
 
 (*
   parser for format
@@ -28,47 +28,44 @@ open Parser;;
   yyyymmdd{space}{space}hh:mm:dd
 *)
 
-let num_parser: string Parser.t =
-  one_of ['0'; '1'; '2'; '3'; '4'; '5'; '6'; '7'; '8'; '9'] >>= fun c -> return (String.make 1 c)
+let num_parser: string parsingrule =
+  one_of ["0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"]
 ;;
 
-let rec datetime_parser: datetime Parser.t =
-  num_parser >>= fun y0 ->
-  num_parser >>= fun y1 ->
-  num_parser >>= fun y2 ->
-  num_parser >>= fun y3 ->
-  num_parser >>= fun mo0 ->
-  num_parser >>= fun mo1 ->
-  num_parser >>= fun d0 ->
-  num_parser >>= fun d1 ->
-  token ' ' >>= fun () ->
-  token ' ' >>= fun () ->
-  num_parser >>= fun h0 ->
-  num_parser >>= fun h1 ->
-  token ':' >>= fun () ->
-  num_parser >>= fun mi0 ->
-  num_parser >>= fun mi1 ->
-  token ':' >>= fun () ->
-  num_parser >>= fun s0 ->
-  num_parser >>= fun s1 ->
+let rec datetime_parser: datetime parsingrule =
+  fun pb ->
+    let y0 = num_parser pb in
+    let y1 = num_parser pb in
+    let y2 = num_parser pb in
+    let y3 = num_parser pb in
+    let mo0 = num_parser pb in
+    let mo1 = num_parser pb in
+    let d0 = num_parser pb in
+    let d1 = num_parser pb in
+    let () = word " " pb in
+    let () = word " " pb in
+    let h0 = num_parser pb in
+    let h1 = num_parser pb in
+    let () = word ":" pb in
+    let mi0 = num_parser pb in
+    let mi1 = num_parser pb in
+    let () = word ":" pb in
+    let s0 = num_parser pb in
+    let s1 = num_parser pb in
 
-  return {
-    year = int_of_string (String.concat "" [y0; y1; y2; y3]);
-    mounth = int_of_string (String.concat "" [mo0; mo1]);
-    day = int_of_string (String.concat "" [d0; d1]);
-    hour = int_of_string (String.concat "" [h0; h1]);
-    minute = int_of_string (String.concat "" [mi0; mi1]);
-    second = int_of_string (String.concat "" [s0; s1]);
-    tz = "";
-  }
-and parse_datetime (s: string) : datetime =
-  let stream = Stream.from_string ~filename:"stdin" s in
-  match datetime_parser stream with
-  | Result.Ok (res, _) -> 
-    res
-  | Result.Error (pos, s) ->
-    Format.eprintf "%a: syntax error: %s@." Position.File.format pos s;      
-    raise Pervasives.Exit
+    {
+      year = int_of_string (String.concat "" [y0; y1; y2; y3]);
+      mounth = int_of_string (String.concat "" [mo0; mo1]);
+      day = int_of_string (String.concat "" [d0; d1]);
+      hour = int_of_string (String.concat "" [h0; h1]);
+      minute = int_of_string (String.concat "" [mi0; mi1]);
+      second = int_of_string (String.concat "" [s0; s1]);
+      tz = "";
+    }
+and parse_datetime (str: string) : datetime =
+  let lines = stream_of_string str in
+  let pb = build_parserbuffer lines in
+  datetime_parser pb
 ;;
 
 
