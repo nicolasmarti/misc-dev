@@ -567,10 +567,10 @@ let markerror (pb: parserbuffer) : string =
   match errors with
     | [] -> Buffer.contents pb.bufferstr
     | ((b1,e1), (b2, e2), (b,e), s)::_ ->
-      (*let s1 = Buffer.sub pb.bufferstr 0 b in*)
+      let s1 = Buffer.sub pb.bufferstr 0 b in
       let se = Buffer.sub pb.bufferstr b (e - b) in
-      (* let s2 = Buffer.sub pb.bufferstr (e+1) (Buffer.length pb.bufferstr - e - 1) in*)
-      String.concat "" ["\""; se; "\""; "\n"; 
+      let s2 = Buffer.sub pb.bufferstr (e+1) (Buffer.length pb.bufferstr - e - 1) in
+      String.concat "" [s1; " >>> "; se; " <<< "; s2; "\n"; 
                         string_of_int b1; ":"; string_of_int e1;"-";
                         string_of_int b2; ":"; string_of_int e2;" = ";
                         s]

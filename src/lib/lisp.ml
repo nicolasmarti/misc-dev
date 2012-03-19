@@ -1412,9 +1412,7 @@ let interp_expr ?(verbose: bool = true) ctxt expr =
 	raise Pervasives.Exit
   ) with
     | NoMatch -> 
-      printf "buffer size:=%n\n" (String.length (Buffer.contents pb.bufferstr));
-      printf "buffer content:=%s\n" (Buffer.contents pb.bufferstr);
-      printf "error:= %s\n" (markerror pb);
+      printf "parsing error:=\n%s\n" (markerror pb);
       raise Pervasives.Exit
 ;;
 
@@ -1436,8 +1434,6 @@ let interp_exprs ?(verbose: bool = true) ctxt expr =
       res'
   ) with
     | NoMatch -> 
-      printf "buffer size:=%n\n" (String.length (Buffer.contents pb.bufferstr));
-      printf "buffer content:=%s\n" (Buffer.contents pb.bufferstr);
-      printf "error:= %s\n" (markerror pb);
+      printf "parsing error:=\n%s\n" (markerror pb);
       raise Pervasives.Exit
 ;;
