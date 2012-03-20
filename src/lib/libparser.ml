@@ -343,7 +343,7 @@ let bracket (p: 'a parsingrule) : 'a parsingrule =
 let notpl (l: string list) : unit parsingrule =
   notp (List.fold_left (
     fun acc hd ->
-      let parse = keyword hd () in
+      let parse = word hd in
       orrule acc parse 
   ) nokp l)
 ;;

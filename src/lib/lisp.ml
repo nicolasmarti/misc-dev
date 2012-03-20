@@ -1,9 +1,3 @@
-(*
-
-ocamlfind ocamlopt -package spotlib,planck -c lisp.ml
-ocamlfind ocamlopt -package spotlib,planck -o test lisp.cmx -linkpkg
-
-*)
 open Printf;;
 
 type name = string;;
@@ -709,61 +703,22 @@ object (self)
   method get_name = "string-equal"
 end;;
 
-(*
-let parse_common : string Parser.t =
-  matched (?+ (tokenp (function |'\\' | '%' -> false | _ -> true) <?> "common")) >>= fun s -> 
-  return s
-;;
-
-let parse_formatter args : string Parser.t =
-  token '%' >>= fun _ ->
-  (token_result (function 
-    | 's' -> ( 
-      try 
-	let s = extractStringOrName (List.hd !args) in
-	args := List.tl !args;
-	Result.Ok s
-      with
-	| _ -> Result.Error (String.concat "" ["not a symbol or string: "; expr2string (List.hd !args)])
+let rec parse_formatter args : string parsingrule =
+  fun pb ->
+    (let hd = any_except ["%"] pb in
+     let tl = ((fun pb -> 
+       let () = word "%" pb in
+       let p = one_of ["s"; "d"; "f"] pb in
+       let hd = try match p with | "s" -> extractStringOrName (List.hd args) | "d" -> string_of_int (extractInt (List.hd args)) | "f" -> string_of_float (extractFloat (List.hd args)) with | _ -> raise NoMatch in
+       let args = List.tl args in
+       let tl = parse_formatter args pb in
+       String.concat "" [hd; tl]                  
+     ) 
+     <|> (fun pb -> let _ = eos pb in "")) pb in
+     String.concat "" [hd; tl]
     )
-    | 'd' -> (
-      try 
-	let s = 
-	  try 
-	    string_of_int (extractInt (List.hd !args))
-	  with
-	    | _ -> string_of_float (extractFloat (List.hd !args))
-	in
-	args := List.tl !args;
-	Result.Ok s
-      with
-	| _ -> Result.Error (String.concat "" ["not a numerical: "; expr2string (List.hd !args)])
-    )
-    | 'c' -> Result.Error "NYI"
-    | c -> Result.Error (String.concat "" ["unknown formater: "; String.make 1 c])
-   )
-  ) >>= fun res -> 
-  return res
-;;
+;;    
 
-let parse_escaped : string Parser.t =
-  matched (
-    token '\\' >>= fun _ ->
-    tokenp (fun _ -> true) >>= fun _ ->
-    return ()
-  ) >>= fun s ->
-  match s with
-    | "\\n" -> return "\n"
-    | "\\t" -> return "\t"
-    | "\\r" -> return "\r"
-;;
-
-(* I cannot managed to properly grab the error from parse_formatter ... grrr*)
-let parse_msg args : (string list) Parser.t =
-  (?** (parse_common <|> (parse_formatter args) <|> parse_escaped)) >>= fun l ->
-  eos >>= fun _ ->
-  return l
-;;
 
 class message =
 object (self)
@@ -776,25 +731,20 @@ object (self)
        raise (LispException (StringError "wrong number of arguments"))
      else
        let args = List.map (fun hd -> eval hd ctxt) args in
+       (*printf "args := "; printbox (token2box (expr2token (List args)) 400 2);*)
        let msg = extractString (List.hd args) in
-       let args = ref (List.tl args) in
-       let stream = Stream.from_string ~filename:"stdin" msg in
-       match parse_msg args stream with
-	 | Result.Ok (res, _) -> 
-	   let s = (String.concat "" res) in
-	   printf "%s" s;
-	   String s
-	 | Result.Error (pos, s) ->
-	   raise (LispException (StringError (String.concat "\n" ["in:"; msg; 
-								  String.concat "" ["error @"; 
-										    string_of_int (pos.Pos.line); 
-										    ":"; 
-										    string_of_int (pos.Pos.column); 
-										   ]; 
-								  s])))
+       let args =(List.tl args) in
+       let lines = stream_of_string msg in
+       let pb = build_parserbuffer lines in
+       try
+         let msg = parse_formatter args pb in
+         printf "%s" msg;
+         String msg
+       with
+         | NoMatch ->
+	   raise (LispException (StringError (markerror pb)))
 
 end;;
-*)
 
 class print =
 object (self)
@@ -1233,7 +1183,7 @@ let primitives = [new plus; new mult; new plusone; new minusone;
 		  new eEq; new eLt; new eLe; new eGt; new eGe;
 		  new eeq; new eequal;
 		  new estringlt; new estringlessp; new estringeq; new estringequal;
-		  (*new message;*) new print;
+		  new message; new print;
 		  new econs; new ecar; new ecdr; new enthcdr; new enth; new setcar; new setcdr; new elist;
 		  new length; new symbolname;
 		  new currenttimestring;
@@ -1397,7 +1347,7 @@ let rec parse_expr ?(verbose: bool = false) : expr parsingrule =
 
 (******************************************************************************)
 
-let interp_expr ?(verbose: bool = true) ctxt expr = 
+let interp_expr ?(verbose: bool = false) ctxt expr = 
   let lines = stream_of_string expr in
   let pb = build_parserbuffer lines in
   try (
@@ -1416,7 +1366,7 @@ let interp_expr ?(verbose: bool = true) ctxt expr =
       raise Pervasives.Exit
 ;;
 
-let interp_exprs ?(verbose: bool = true) ctxt expr = 
+let interp_exprs ?(verbose: bool = false) ctxt expr = 
   let lines = stream_of_string expr in
   let pb = build_parserbuffer lines in
   try (
