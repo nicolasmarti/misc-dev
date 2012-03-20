@@ -10,6 +10,7 @@
 <lib/ibtws>: include
 <lib/strat>: include
 <lib/llvm>: include
+<lib/lisp>: include
 
 <tests/teststrat.{ml,byte,native}>: pkg_str
 <tests/testlisp.{ml,byte,native}>: pkg_str, pkg_unix
@@ -19,3 +20,5 @@
 
 
 <lib/core/app/mymms.{ml,byte,native}>: pkg_str, pkg_pycaml, g++, use_llvm, use_llvm_analysis, use_llvm_executionengine, use_llvm_target, use_llvm_scalar_opts, use_bindings
+
+<lib/lisp/pylisp.{ml,byte,native}>: pkg_str, pkg_pycaml

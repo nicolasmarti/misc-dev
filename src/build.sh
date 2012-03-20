@@ -15,7 +15,7 @@ ocb()
 rule() {
   case $1 in
     clean)  ocb -clean;;
-    all)    ocb $CORE;;
+    all)    ocb $CORE; ocb $TESTS;;
     core)  ocb $CORE;;
     tests) ocb $TESTS;;
     *)      echo "Unknown action $1";;

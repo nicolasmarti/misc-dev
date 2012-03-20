@@ -1218,6 +1218,9 @@ let rec execException2box (e: lisp_error) : token =
 				       ]
 ;;
 
+let error2string e =
+  (box2string (token2box (execException2box e) 400 2))
+;;
 
 (******************************************************************************)
 
