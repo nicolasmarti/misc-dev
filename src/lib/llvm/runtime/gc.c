@@ -1,8 +1,34 @@
 #include<stdio.h> //printf
 #include<malloc.h> //memalign
 #include<string.h> //memset
-#include<stdbool.h> // bool, true, false
 
+#ifndef GC_INCLUDE
+#define GC_INCLUDE
+
+typedef unsigned long uint;
+
+typedef char bool;
+
+#define true 1;
+#define false 0;
+
+// gc initialization with segment of size 2**n
+char gc_init(uint n);
+
+// allocation function (the bool means that it is a root)
+void* gc_alloc(uint size, bool root);
+
+// the freeing of data (only work for root)
+void gc_free(void* data);
+
+// unset as root
+void unset_root(void* data);
+
+// set as root
+void set_root(void* data);
+
+
+#endif
 
 /*
 
@@ -15,7 +41,6 @@
 
 
  */
-typedef unsigned long uint;
 
 char *byte_to_binary
 (
@@ -1491,7 +1516,7 @@ void bitmapMarkingGC()
 }
 
 // allocation function (the bool means that it is a root)
-void* alloc(uint size, bool root)
+void* gc_alloc(uint size, bool root)
 {
   if (size == 0)
     return NULL;
@@ -1531,7 +1556,7 @@ void* alloc(uint size, bool root)
 }
 
 // the freeing of data (only work for root)
-void free(void* data)
+void gc_free(void* data)
 {
   return freeBlock(data);
 }
@@ -1626,13 +1651,13 @@ char gc_init(uint n){
   if(sizeof(void*) != sizeof(uint)) {
     //we assert that it is a proper power of two
     printf("catasrophic: uint and void* are of different size !!!");
-    return 0;
+    return 1;
   }
 
   if(ptr_size_bit != (uint)(1) << ptr_size_bit_pow2) {
     //we assert that it is a proper power of two
     printf("catasrophic: ptr_size_bit is not a power of 2: %lu != 1 << %lu == %lu\n", ptr_size_bit, ptr_size_bit_pow2, (uint)(1) << ptr_size_bit_pow2);
-    return 0;
+    return 1;
   }
 
   // init the the segment size and the mask
@@ -1683,118 +1708,7 @@ char gc_init(uint n){
   for (i = 0; i <= max_bulk_size; ++i)
     initHeap(&heaps[i], 1 << i);
 
-  /*
-  // a heap
-  heap h;
-
-  h.segment_start = NULL;
-  h.segment_end = NULL;
-  h.curr_segment = NULL;
-  h.bulk_size = 3;
-  h.nb_bulk = nb_bulk_ub(segment_size_ub, h.bulk_size);
-  h.index = 0;
-  h.mask = 1;
-
-  //
-
-  printf("segment_size == %lu (>= %lu) /\\ bulk_size == %lu (sizeof == %lu) -> nb_bulk == %lu\n", 
-	 segment_size_ub,
-	 segment_size(h.nb_bulk, h.bulk_size),	 
-	 h.bulk_size, 
-	 h.bulk_size * ptr_size_byte, 
-	 h.nb_bulk
-	 );
-
-  printf("(%p, %p)\n", min_segment_start, max_segment_end);
-
-  // add 6 free segments
-  void* s1 = create_segment();
-  void* s2 = create_segment();
-  void* s3 = create_segment();
-  void* s4 = create_segment();  
-  //void* s5 = create_segment();
-  //void* s6 = create_segment();
-  
-  print_list(free_segment_start, free_segment_end,0);
-  
-  // some test ********************************************************
-  printf("**************** alloc *********************\n");
-  // alloc as much as possibly: all segment should be used
-  void* alloc = (void*)(1);
-  void* good_alloc = NULL;
-  uint count = 0;
-  while (alloc != NULL)
-    {
-
-      alloc = allocHeap(&h, good_alloc == NULL);
-
-      if (good_alloc == NULL && alloc != NULL)
-	good_alloc = alloc;
-
-      //printf("alloc = %p\n", alloc);
-      if (alloc != NULL) 
-	{ ++count; 
-	}
-
-    }
-
-  printf("nb alloc := %lu (== %lu)\n\n", count, 4*h.nb_bulk);
-  //print_list(h.segment_start, h.segment_end, h.nb_bulk);
-  printf("\n\n");
-
-  // some test ********************************************************
-  
-  printf("**************** free one *********************\n");
-
-  // try to realease the first allocated (in the first segment)
-  freeBlock(good_alloc);
-  printf("free = %p\n", good_alloc);
-  //print_list(h.segment_start, h.segment_end, h.nb_bulk);
-  printf("\n\n");
-
-  printf("**************** realloc *********************\n");
-
-  // try to realloc
-
-  alloc = allocHeap(&h, true);
-  printf("alloc = %p\n", alloc);
-  //print_list(h.segment_start, h.segment_end, h.nb_bulk);
-
-  printf("**************** clear and rearrange *********************\n");
-
-  // we artificially reset counter/bitmap of the second segment of the heap
-  printf("clearing segment 2 (%p)\n", get_segment_next(h.segment_start));
-  clearARBMandCount(get_segment_next(h.segment_start), h.nb_bulk);
-
-  // then we rearrange 
-  printf("rearranging list\n");
-  rearrangeSegList(&h);
-  //print_list(h.segment_start, h.segment_end, h.nb_bulk);
-
-  printf("**************** reallocate *********************\n");
-
-  // and we try to reallocate
-  count = 0;
-  while (alloc != NULL)
-    {
-
-      alloc = allocHeap(&h, true);
-
-      if (alloc != NULL) 
-	++count;
-
-    }
-
-  printf("nb alloc := %lu (== %lu)\n", count, h.nb_bulk);
-  //print_list(h.segment_start, h.segment_end, h.nb_bulk);
-
-  printf("**************** garbage collecting *********************\n");
-
-  // call tracing
-  traceHeapLiveObjects(&h);
-  */
-
-  return -1;
+  return 0;
 }
 
 #ifdef WITHMAIN
@@ -1805,7 +1719,7 @@ int main(int argc, char** argv, char** arge)
   // something stupid: allocated until you can't (increasing wanted size)
   uint size = 1;
   void* data;
-  while ((data = alloc(size, false)) != NULL)
+  while ((data = gc_alloc(size, false)) != NULL)
     {
       //printf("size := %lu, data := %p\n", size, data);
       ++size;
@@ -1815,12 +1729,12 @@ int main(int argc, char** argv, char** arge)
 
   print_heaps();  
 
-  alloc(--size, true);
-  alloc(size, true);
-  alloc(size, true);
-  alloc(size, true);
-  alloc(size, true);
-  alloc(size, true);
+  gc_alloc(--size, true);
+  gc_alloc(size, true);
+  gc_alloc(size, true);
+  gc_alloc(size, true);
+  gc_alloc(size, true);
+  gc_alloc(size, true);
 
   print_heaps();  
 

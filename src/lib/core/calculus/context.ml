@@ -301,7 +301,7 @@ let rec flush_fvars (defs: defs) (ctxt: context ref) (l: term list) : term list 
 	   we try to ask an oracle if it can guess the term
 	*)
 	if !debug_oracles then printf "flush_fvars asks to oracles: %s\n" (!term2string_ptr !ctxt ty);
-	let guessed_value = fold_stop (fun () oracle ->
+	let _(*guessed_value*) = fold_stop (fun () oracle ->
 	  match oracle (defs, !ctxt, ty) with
 	    | None -> Left ()
 	    | Some prf ->

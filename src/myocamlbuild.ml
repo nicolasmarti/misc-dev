@@ -9,7 +9,7 @@ ocaml_lib ~extern:true "llvm_scalar_opts";;
 ocaml_lib ~extern:true "llvm_bitwriter";;
 
 flag ["link"; "ocaml"; "g++"] (S[A"-cc"; A"g++"; A"-cclib"; A"-rdynamic"]);;
-dep ["link"; "ocaml"; "use_bindings"] ["lib/core/comp/runtime/runtime.o"; "lib/core/comp/runtime/gc.o"];;
+dep ["link"; "ocaml"; "use_bindings"] ["lib/llvm/runtime/runtime.o"; "lib/llvm/runtime/gc.o"];;
 
 (* these functions are not really officially exported *)
 let run_and_read = Ocamlbuild_pack.My_unix.run_and_read

@@ -8,8 +8,8 @@
 <lib/core/interp/interp.{ml,byte,native}>: pkg_pycaml
 
 <lib/ibtws>: include
-
 <lib/strat>: include
+<lib/llvm>: include
 
 <tests/teststrat.{ml,byte,native}>: pkg_str
 <tests/testlisp.{ml,byte,native}>: pkg_str, pkg_unix
