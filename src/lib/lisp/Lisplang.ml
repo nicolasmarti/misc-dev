@@ -5,6 +5,8 @@ module L = struct
     
   let ctxt = ref (Lisp.init_ctxt ())
 
+  let saved_ctxt : (Lisp.env list) ref = ref []
+
   (* the name of the language *)
   let name = "Lisp"
 
@@ -23,7 +25,7 @@ module L = struct
   let value2string = Lisp.expr2string
 
   (* initialization *)
-  let init () = (ctxt := Lisp.init_ctxt ())
+  let init () = ctxt := Lisp.init_ctxt (); saved_ctxt := []
 
   (* equality over two values *)
   let eq_value v1 v2 = Lisp.eq v1 v2
@@ -45,10 +47,29 @@ module L = struct
       with
 	| NoMatch -> raise (Lisp.LispException (Lisp.StringError (markerror pb)))
     ) in
-    Lisp.eval e !ctxt
-    
+    let s_ctxt = !ctxt in
+    try (
+      let res = Lisp.eval e !ctxt in
+      ctxt := s_ctxt;
+      res    
+    ) with | e -> ctxt := s_ctxt; raise e
 
-  let definition s = 0
+  let definition s = 
+    let s_ctxt = !ctxt in
+    let lines = stream_of_string s in
+    let pb = build_parserbuffer lines in
+    let es = (
+      try
+	many1 Lisp.parse_expr pb 
+      with
+	| NoMatch -> 	  
+	  raise (Lisp.LispException (Lisp.StringError (markerror pb)))
+    ) in  
+    try (
+      let _ = List.map (fun hd -> Lisp.eval hd !ctxt) es in
+      saved_ctxt := s_ctxt::!saved_ctxt;
+      pb.beginpointer
+    ) with | e -> ctxt := s_ctxt; raise e
 
   let undo_definition () = ()
 
