@@ -71,6 +71,8 @@ module L = struct
       pb.beginpointer
     ) with | e -> ctxt := s_ctxt; raise e
 
-  let undo_definition () = ()
+  let undo_definition () = 
+    ctxt := List.hd !saved_ctxt;
+    saved_ctxt := List.tl !saved_ctxt
 
 end
