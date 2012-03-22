@@ -18,6 +18,7 @@ rule() {
     all)    ocb $CORE; ocb $TESTS;;
     core)  ocb $CORE;;
     tests) ocb $TESTS;;
+    gc)    clang -DWITHMAIN -o _build/gc ./lib/llvm/runtime/gc.c;;
     *)      echo "Unknown action $1";;
   esac;
 }

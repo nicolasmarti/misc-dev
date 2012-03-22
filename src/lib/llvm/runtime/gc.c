@@ -9,8 +9,8 @@ typedef unsigned long uint;
 
 typedef char bool;
 
-#define true 1;
-#define false 0;
+#define true 1
+#define false 0
 
 // gc initialization with segment of size 2**n
 char gc_init(uint n);
