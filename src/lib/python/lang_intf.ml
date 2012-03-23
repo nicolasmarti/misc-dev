@@ -37,7 +37,7 @@ module type Lang = sig
   (* definition: parse and update the context
      return the number of consumed charaters
   *)
-  val definition: string -> int
+  val definition: string -> int * (string * value) array
 
   (* undo: undo previous definitions *)
   val undo_definition: unit -> unit

@@ -333,7 +333,7 @@ if __name__ == '__main__':
     
     win = gtk.Window()
 
-    win.add(PGFrame("Lisp"))    
+    win.add(PGFrame("Calculus"))    
 
     win.connect('destroy', lambda win: gtk.main_quit())
 

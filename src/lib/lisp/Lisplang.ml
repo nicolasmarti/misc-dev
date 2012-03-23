@@ -55,7 +55,7 @@ module L = struct
     ) with | e -> ctxt := s_ctxt; raise e
 
   let definition s = 
-    let s_ctxt = !ctxt in
+    let s_ctxt = Hashtbl.copy !ctxt in
     let lines = stream_of_string s in
     let pb = build_parserbuffer lines in
     let es = (
@@ -67,8 +67,17 @@ module L = struct
     ) in  
     try (
       let _ = List.map (fun hd -> Lisp.eval hd !ctxt) es in
+
+      let defined = Array.of_list (
+      (* val fold : ('a -> 'b -> 'c -> 'c) -> ('a, 'b) t -> 'c -> 'c *)
+      Hashtbl.fold (fun name expr acc ->
+	if not (Hashtbl.mem s_ctxt name) then
+	  (name, expr)::acc
+	else acc
+      ) !ctxt []
+      ) in      
       saved_ctxt := s_ctxt::!saved_ctxt;
-      pb.beginpointer
+      pb.beginpointer, defined
     ) with | e -> ctxt := s_ctxt; raise e
 
   let undo_definition () = 

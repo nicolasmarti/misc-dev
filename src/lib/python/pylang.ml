@@ -4,6 +4,9 @@ open Lang_intf
 
 module PyLang =
   functor (L: Lang) -> struct
+
+    (* defined terms *)
+    let defined = ref []
     
     (* debug flag *)
     let debug = ref false;;
@@ -223,8 +226,14 @@ def createValue";L.name;"(id):
       (fun [| str |] ->
 	let str = pystring_asstring str in
 	try
-	  let res = L.definition str in
-	  pyint_fromint res	  
+	  let (consumed, defs) = L.definition str in
+	  let names = Array.map (fun (hd1, hd2) ->
+	    let pte = wrap_value hd2 in
+	    let _ = pydict_setitemstring (mdl_dict, hd1, pte) in
+	    hd1
+	  ) defs in
+	  defined := names::!defined;
+	  pyint_fromint consumed	  
 	with
 	  | L.Exception err -> 
 	    raise (Failure (L.error2string err))
@@ -238,7 +247,11 @@ def createValue";L.name;"(id):
       [| |]
       (fun [|  |] ->
 	try
-	  L.undo_definition (); pynone ()
+	  L.undo_definition (); 
+	  let names = List.hd !defined in
+	  defined := List.tl !defined;
+	  Array.iter (fun hd -> ignore(pydict_delitemstring (mdl_dict, hd))) names;
+	  pynone ()
 	with
 	  | L.Exception err -> 
 	    raise (Failure (L.error2string err))

@@ -6,6 +6,7 @@
 <lib/core/comp>: include
 <lib/core/primitives>: include
 <lib/core/interp/interp.{ml,byte,native}>: pkg_pycaml
+<lib/core/interp/pycalculus.{ml,byte,native}>: pkg_pycaml
 
 <lib/ibtws>: include
 <lib/strat>: include
