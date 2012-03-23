@@ -189,7 +189,7 @@ class PG(gtksourceview2.View, keybinding.KeyBinding):
 
     # proceed all definitions
     def proceed_all(self):
-        while self.module.undo_definition():
+        while self.proceed_definition():
             None
 
     #show defs
