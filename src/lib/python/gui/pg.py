@@ -32,6 +32,7 @@ class PG(gtksourceview2.View, keybinding.KeyBinding):
     def __init__(self, modulename):
 
         # store the module
+        exec ("import " + modulename) in globals()
         self.module = eval (modulename)
         print "module loaded: " + str(self.module)
 

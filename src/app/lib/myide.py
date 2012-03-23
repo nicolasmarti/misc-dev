@@ -22,8 +22,6 @@ from pg import *
 
 gtk.gdk.threads_init()
 
-import Doudou
-
 def main():
     gtk.gdk.threads_enter()
     gtk.main()
@@ -60,8 +58,14 @@ if __name__ == "__main__":
 
     #
     
-    pgf = PGFrame()
-    notebook.append_page(pgf, gtk.Label("editor"))
+    pgf1 = PGFrame("Calculus")
+    notebook.append_page(pgf1, gtk.Label("Calculus"))
+
+    #
+
+    pgf2 = PGFrame("Lisp")
+    notebook.append_page(pgf2, gtk.Label("Lisp"))
+
     #
 
     window.show_all()
