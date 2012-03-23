@@ -62,15 +62,15 @@ module L = struct
 	(* we restore the context and defs *)
 	ctxt := saved_ctxt;
 	defs := saved_defs;
-	raise (Failure (error2string err))
+	raise (DoudouException err)
       | Failure s -> 
 	ctxt := saved_ctxt;
 	defs := saved_defs;
-	raise (Failure s)
+	raise (DoudouException (FreeError s))
       | _ -> 
 	ctxt := saved_ctxt;
 	defs := saved_defs;
-	raise (Failure "calculus.apply: unknown exception")
+	raise (DoudouException (FreeError "calculus.apply: unknown exception"))
 
   let eval s = 
     (* we set the parser *)
@@ -82,23 +82,18 @@ module L = struct
     let pb = build_parserbuffer lines in
     try
       let startpos = cur_pos pb in
-
       let te = parse_term !defs startpos pb in
-
       let te, ty = process_term defs ctxt te in
-
       te
-
     with
-	  (* TODO: return proper python exception *)
+      (* TODO: return proper python exception *)
       | NoMatch -> 
-	raise (Failure (String.concat "\n" ["parsing error in:"; Buffer.contents pb.bufferstr; markerror pb]))
+	raise (DoudouException (FreeError (markerror pb)))
       | DoudouException err -> 
-	    (* we restore the context and defs *)
+	(* we restore the context and defs *)
 	ctxt := saved_ctxt;
 	defs := saved_defs;
-	raise (Failure (error2string err))
-
+	raise (DoudouException err)
 
 
   let definition s =
@@ -113,20 +108,19 @@ module L = struct
       let symbs = process_definition ~verbose:false defs ctxt def in
       let defined = List.map (fun symb ->
 	let s = (symbol2string symb) in
-	(*printf "registering %s\n" s;*)
 	let te = Cste (symb, nopos) in
 	s, te
       ) symbs in
       consumed, Array.of_list defined
     with
-      (* TODO: return proper python exception *)
       | NoMatch -> 
-	raise (Failure (String.concat "\n" ["parsing error in:"; Buffer.contents pb.bufferstr; markerror pb]))
+	printf "error definition: %s\n" (markerror pb); flush Pervasives.stdout;
+	raise (DoudouException (FreeError (markerror pb)))
       | DoudouException err -> 
-	(* we restore the context and defs *)
+	    (* we restore the context and defs *)
 	ctxt := saved_ctxt;
 	defs := saved_defs;
-	raise (Failure (error2string err))
+	raise (DoudouException err)
 
   let undo_definition () = 
     ignore(undoDefinition defs)
