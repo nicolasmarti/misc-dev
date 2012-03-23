@@ -10,6 +10,9 @@ from sets import *
 
 import spreadsheet
 
+import Calculus
+import Lisp
+
 class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
     
     def __init__(self, _locals = None):
