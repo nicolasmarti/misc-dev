@@ -1,0 +1,13 @@
+bool :: Type :=
+| true :: bool
+| false :: bool
+
+True :: Type :=
+| I :: True
+
+
+False :: Type :=
+
+is_true :: bool -> Type
+is_true true := True
+is_true false := False
