@@ -1,18 +1,17 @@
 <lib>: include
 
+<lib/core>: include
 <lib/core/calculus>: include
 <lib/core/calculus2>: include
-<lib/core/interp>: include
-<lib/core/comp>: include
 <lib/core/primitives>: include
-<lib/core/interp/interp.{ml,byte,native}>: pkg_pycaml
-<lib/core/interp/pycalculus.{ml,byte,native}>: pkg_pycaml
+<lib/core/pycalculus.{ml,byte,native}>: pkg_pycaml
 
 <lib/ibtws>: include
 <lib/strat>: include
 <lib/llvm>: include
 <lib/lisp>: include
 <lib/lisp/Lisplang.{ml,byte,native}>: pkg_pycaml
+
 <lib/python>: include
 <lib/python/lang_intf.{ml,byte,native}>: pkg_pycaml
 <lib/python/pylang.{ml,byte,native}>: pkg_pycaml
@@ -23,8 +22,4 @@
 <tests/testibtws.{ml,byte,native}>: pkg_unix, pkg_threads, pkg_str
 <tests/testparser.{ml,byte,native}>: pkg_str
 
-
-<lib/core/app/mymms.{ml,byte,native}>: pkg_str, pkg_pycaml, g++, use_llvm, use_llvm_analysis, use_llvm_executionengine, use_llvm_target, use_llvm_scalar_opts, use_bindings
-
-<lib/lisp/pylisp.{ml,byte,native}>: pkg_str, pkg_pycaml
-<lib/python/snake.{ml,byte,native}>: pkg_str, pkg_pycaml
+<app/snake.{ml,byte,native}>: pkg_str, pkg_pycaml
