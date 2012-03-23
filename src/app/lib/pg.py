@@ -14,10 +14,11 @@ import pango
 from sets import *
 import keybinding
 
-try:
-    import Doudou
-except:
-    None
+# no need for import (imported before pymain call)
+#try:
+#    import Doudou
+#except:
+#    None
 
 def error_dialog(parent, msg):
     dialog = gtk.MessageDialog(parent,
