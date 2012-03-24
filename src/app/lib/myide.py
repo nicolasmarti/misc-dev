@@ -40,11 +40,6 @@ if __name__ == "__main__":
 
     #
 
-    evalf = EvalFrame()
-    notebook.append_page(evalf, gtk.Label(evalf.get_label()))
-
-    #
-
     sheetf = gtk.Frame()
     sw = gtk.ScrolledWindow()
     sw.set_shadow_type(gtk.SHADOW_ETCHED_IN)
@@ -55,6 +50,11 @@ if __name__ == "__main__":
     sheetf.add(sw)
     sheetf.show()
     notebook.append_page(sheetf, gtk.Label("sheet"))
+
+    #
+
+    evalf = EvalFrame(ss.ss)
+    notebook.append_page(evalf, gtk.Label(evalf.get_label()))
 
     #
     
