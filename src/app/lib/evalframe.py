@@ -159,7 +159,7 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         self.update_vars()
 
     def update_vars(self):
-        print "update_vars"
+        #print "update_vars"
         # is there new vars ?
         for d in self.m_locals:
             if not d in self.name2iter.keys():
