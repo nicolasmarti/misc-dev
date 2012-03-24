@@ -9,7 +9,7 @@ import Lisp
 
 class SpreadSheet:
 
-  def __init__(self, _globals = None, callback = None, file = None):
+  def __init__(self, _globals = None, callback = [], file = None):
 
     if _globals == None:
       self._globals = globals()
@@ -147,8 +147,8 @@ class SpreadSheet:
       del self._cells[key]
       self.recompute_dependency(key)
       del self._dep[key]
-      if self.callback <> None:
-        self.callback("delete", key)
+      for i in self.callback:
+        i("delete", key)
     except Exception as e:
       print "error := " + str(e)
       pass
@@ -174,8 +174,11 @@ class SpreadSheet:
       self._cells[key] = (None, formula)
 
     # calling call back
-    if self.callback <> None:
-      self.callback("update", (key, self._cells[key][1]))
+    for i in self.callback:
+      try:
+        i("update", (key, self._cells[key][1]))
+      except:
+        pass
 
     if self._debug:
       print "self.__setitem__(" + key + ", " + str(formula) + ") = " + str(self.getvalue(key))
@@ -310,10 +313,13 @@ class SpreadSheet:
 
     (self._cells, self._dep) = load(file)
     
-    if self.callback <> None:
+    for i in self.callback:
       for key in self._cells:
-        self.callback("update", (key, self._cells[key][1]))
-      
+        try:
+          i("update", (key, self._cells[key][1]))
+        except:
+          pass
+
   def keys(self):
     return self._cells.keys()
 

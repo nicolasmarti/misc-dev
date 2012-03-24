@@ -105,7 +105,7 @@ class Sheet(gtk.TreeView):
         gtk.TreeView.__init__(self)
 
         # the underlying ss
-        self.ss = SpreadSheet(callback = self.setcell, _globals = globals())
+        self.ss = SpreadSheet(callback = [self.setcell], _globals = globals())
 
         # numbers of row / columns
         self.numCols = numCols

@@ -53,7 +53,7 @@ if __name__ == "__main__":
 
     #
 
-    evalf = EvalFrame(ss.ss)
+    evalf = EvalFrame(_locals = ss.ss)
     notebook.append_page(evalf, gtk.Label(evalf.get_label()))
 
     #

@@ -155,17 +155,7 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         self.textview.grab_focus()
         return
 
-
-    def myexec(self, data=None):
-        m_str = self.textbuffer.get_text(self.textbuffer.get_start_iter(), self.textbuffer.get_end_iter())
-        try:
-            exec m_str in globals(), self.m_locals
-            self.textbuffer2.set_text("")        
-            self.m_start = self.textbuffer.get_end_iter()
-            self.textbuffer.set_text("")
-        except BaseException as e:
-            self.textbuffer2.set_text(str(e))        
-
+    def update_vars(self):
         # is there new vars ?
         for d in self.m_locals:
             if not d in self.name2iter.keys():
@@ -182,6 +172,21 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
             if not d in self.m_locals:
                 # remove the var
                 self.treestore.remove(self.name2iter[d])
+
+        return
+
+    def myexec(self, data=None):
+        m_str = self.textbuffer.get_text(self.textbuffer.get_start_iter(), self.textbuffer.get_end_iter())
+        try:
+            exec m_str in globals(), self.m_locals
+            self.textbuffer2.set_text("")        
+            self.m_start = self.textbuffer.get_end_iter()
+            self.textbuffer.set_text("")
+        except BaseException as e:
+            self.textbuffer2.set_text(str(e))        
+            raise e
+
+        self.update_vars()
                 
         self.hist.append(m_str)
         self.histn = None
