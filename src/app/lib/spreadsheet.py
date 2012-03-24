@@ -148,7 +148,10 @@ class SpreadSheet:
       self.recompute_dependency(key)
       del self._dep[key]
       for i in self.callback:
-        i("delete", key)
+        try:
+          i("delete", key)
+        except:
+          pass
     except Exception as e:
       print "error := " + str(e)
       pass
@@ -322,6 +325,9 @@ class SpreadSheet:
 
   def keys(self):
     return self._cells.keys()
+
+  def add_callback(self, f):
+    self.callback.append(f)
 
 
 if __name__ == '__main__':

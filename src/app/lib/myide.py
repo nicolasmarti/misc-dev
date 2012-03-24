@@ -53,8 +53,9 @@ if __name__ == "__main__":
 
     #
 
-    evalf = EvalFrame(_locals = ss.ss)
+    evalf = EvalFrame(ss.ss)
     notebook.append_page(evalf, gtk.Label(evalf.get_label()))
+    ss.ss.add_callback(evalf.update_vars_callback)
 
     #
     

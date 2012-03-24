@@ -155,7 +155,11 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         self.textview.grab_focus()
         return
 
+    def update_vars_callback(self, action, param):
+        self.update_vars()
+
     def update_vars(self):
+        print "update_vars"
         # is there new vars ?
         for d in self.m_locals:
             if not d in self.name2iter.keys():
@@ -272,6 +276,9 @@ if __name__ == '__main__':
     ss = spreadsheet.SpreadSheet(_globals = globals())
     evalf = EvalFrame(ss)
     sw.add(evalf)
+
+    ss.add_callback(evalf.update_vars_callback)
+
     win = gtk.Window()
     win.add(sw)
 
