@@ -168,9 +168,14 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
                 try:
                     name = name + " := " + self.m_locals.getformula(d)[1:]
                 except:
-                    None
+                    pass
+                try:
+                    name = name + " == " + str(self.m_locals.getvalue(d))
+                except:
+                    pass
                 iter = self.treestore.append(None, [name])
                 self.name2iter[d] = iter
+            # have to do those in ...
 
         for d in self.name2iter.keys():
             if not d in self.m_locals:
