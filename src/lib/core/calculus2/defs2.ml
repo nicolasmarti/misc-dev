@@ -82,8 +82,6 @@ type term = TSort of Sort * pos
 
 	    | Match of term * (term array * term) array * pos * typeannotation
 
-	    | TCoercion of term * term * typeannotation
-
 and typeannotation = NoTypeAnnotation
 		     | AnnotatedType of term
 		     | InferedType of term
@@ -93,6 +91,7 @@ and value = Inductive of name array
 	    | Axiom
 	    | Equation of (term * name option * term) array
 	    | Coercion
+	    | Module of definition
 
 and frame = {
   name: name;
@@ -108,4 +107,4 @@ and frame = {
   patternstack: pattern list;
 }
 
-and definition = (string, (symbol * term * value)) Hashtbl.t
+and definition = (name, (term * value)) Hashtbl.t
