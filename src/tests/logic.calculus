@@ -8,6 +8,6 @@ True :: Type :=
 
 False :: Type :=
 
-is_true :: bool -> Type
-is_true true := True
-is_true false := False
+istrue :: bool -> Type
+istrue true := True
+istrue false := False
