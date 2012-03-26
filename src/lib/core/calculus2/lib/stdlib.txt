@@ -1,0 +1,7 @@
+Logic: primitive logic connectives 
+Eq: logical equality
+Bool: boolean values
+EqDec: decidable equality
+LogicDec: decidable logic
+Ord: decidable order
+Peano: peano numbers
