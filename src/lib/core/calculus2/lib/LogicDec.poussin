@@ -1,0 +1,16 @@
+module LogicDec where
+
+  Require Logic
+  Require Bool
+
+  bool2prop :: bool -> Prop
+  bool2prop true := True
+  bool2prop false := False
+
+  Coercion (b :: bool) :: Prop := bool2prop
+
+  reflectbool :: (P :: Prop) -> (b :: bool) -> Prop :=
+  | reflectboolT :: P -> reflectbool P true
+  | reflectboolF :: ~ P -> reflectbool P false
+       
+end

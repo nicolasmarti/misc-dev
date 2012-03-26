@@ -1,0 +1,15 @@
+module EqDec (A :: Set) where
+
+  Require Eq
+  Require Bool
+  Require LogicDec
+  
+  eqb :: A -> A -> bool
+  
+  Notation eqb (==) none 110
+
+  Notation (negb (?a == ?b)) (a != b) none 110
+
+  eqP (a b :: A) :: reflectbool (a = b) (a == b)
+
+end

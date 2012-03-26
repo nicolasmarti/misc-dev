@@ -16,4 +16,4 @@ module Peano where
 
   Notation minus (-) left 50
 
-  
+end  

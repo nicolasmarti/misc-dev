@@ -26,3 +26,5 @@ module Bool where
   negb false := true
 
   Notation negb [~~) none 150
+
+end

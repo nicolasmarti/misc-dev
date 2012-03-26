@@ -1,24 +1,16 @@
-Require Bool
-Require Logic
+module Eq where
 
-eq [A:: Set] (a :: A) :: A -> Prop :=
-| eqrefl :: eq a a
+  eq [A:: Set] (a :: A) :: A -> Prop :=
+  | eqrefl :: eq a a
 
-Notation eq (=) none 110
+  Notation eq (=) none 110
 
-eqrec :: {A :: Set} -> {B :: Type} -> (P :: A -> B) ->
+  eqrec :: {A :: Set} -> (P :: A -> Type) ->
  	      (a b :: A) -> (a = b) -> P a -> P b
 
-eqrec {?A} {?B} ?P ?a ?b ?Heq ?Pa :=
-  match Heq with
-    | eqrefl a := Pa
+  eqrec {?A} {?B} ?P ?a ?b ?Heq ?Pa :=
+    match Heq with
+      | eqrefl a := Pa
 
-module Eq (A :: Set) where
+end
 
-  eqb :: A -> A -> bool
-  
-  Notation eqb (==) none 110
-
-  Notation (negb (?a == ?b)) (a != b) none 110
-
-  eqP (a b :: A) :: reflectbool (a = b) (a == b)
