@@ -1,0 +1,71 @@
+Require Logic
+Require Bool
+Require Eq
+
+module Eq comparaison where
+  
+  eqb ?x ?x := true
+  eqb _ _ := false
+  
+  Lemma eqP :: (a b :: A) -> reflectbool (a = b) (a == b)
+  elim; elim; 
+    match goal with 
+      | _ |- reflect _ true := cut reflectboolT; exact eq_refl
+      | _ |- reflect _ false := cut reflectboolF; cut contr; intro; intro H; elim H
+    end
+  Qed.
+
+
+module Ord (A :: Set) where
+
+  comparaison :: Set :=
+  | iseq :: comparaison
+  | islt :: comparaison
+  | isgt :: comparaison
+       
+  compare :: A -> A -> comparaison
+
+  Notation compare (=?=) none 110
+
+  beq :: A -> A -> bool
+  beq a b := (a =?= b) == iseq
+  
+  Notation beq (==) none 110
+
+  blt :: A -> A -> bool 
+  blt a b := (a =?= b) == islt
+
+  Notation blt (<<) none 110
+
+  bgt :: A -> A -> bool 
+  bgt a b := (a =?= b) == isgt
+
+  Notation bgt (>>) none 110
+
+  lt :: A -> A -> Prop
+  Notation tt (<) none 110
+
+  gt :: A -> A -> Prop
+  Notation gt (>) none 110
+
+  reflectcomparaison (a b :: A) :: comparaison -> Prop :=
+  | reflectiseq :: (a = b) -> ~ (a < b) -> ~ (a > b) -> reflectcomparaison iseq
+  | reflectislt :: ~(a = b) -> (a < b) -> ~ (a > b) -> reflectcomparaison islt
+  | reflectisgt :: ~(a = b) -> ~(a < b) -> (a > b) -> reflectcomparaison isgt	
+
+  ordP (a b :: A) :: reflectcomparaison a b (a =?= b)
+
+  module Eq A where
+    
+    eqb a b := beq a b
+    
+    Lemma eqP :: (a b :: A) -> reflectbool (a = b) (a == b)
+     intro; intro; elim (ordP a b);
+       match goal with
+         | ?H :: a = b |- reflectbool _ true := cut reflectboolT; exact H
+	 | ?H :: ~ (a = b) |- reflectbool _ false := cut reflectboolF; exact H
+       end.
+    Qed.
+  
+  
+  

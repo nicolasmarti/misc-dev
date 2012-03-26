@@ -1,0 +1,28 @@
+module Bool where
+  
+  bool :: Set := | true :: bool | false :: bool
+
+  andb :: bool -> bool -> bool
+  andb false _ : andeq1 := false
+  andb _ false : andeq2 := false
+  andb true true : andeq3 := true
+
+  Notation andb (&&) left 100
+
+  orb :: bool -> bool -> bool
+  orb true _ : oreq1 := true
+  orb _ true : oreq2 := true
+  orb false false : oreq3 := false
+
+  Notation orb (||) left 90
+
+  implb :: bool -> bool -> bool
+  implb false _ : impleq1 := true
+  implb _ true : impleq2 := true
+  implb _ _ : impleq3 := false
+
+  nebg :: bool -> bool
+  negb true := false
+  negb false := true
+
+  Notation negb [~~) none 150

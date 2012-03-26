@@ -1,0 +1,34 @@
+module Logic where
+
+  True :: Prop := | I :: True
+ 
+  False :: Prop := 
+
+  neg (P :: Prop) :: Prop :=
+  | contr :: ({C :: Type} -> P -> C) -> neg P
+
+  Notation neg [~) none 150
+
+  and [A B :: Prop] :: Prop := | conj :: A -> B -> A and B
+
+  Notation and (/\\) left 100
+
+  or [A B :: Prop] :: Prop :=
+  | left :: A -> or A B
+  | right :: B -> or A B
+
+  Notation or (\//) left 90
+
+  Require Bool
+
+  bool2prop :: bool -> Prop
+  bool2prop true := True
+  bool2prop false := False
+
+  Coercion (b :: bool) :: Prop := bool2prop
+
+  reflectbool :: (P :: Prop) -> (b :: bool) -> Prop :=
+  | reflectboolT :: P -> reflectbool P true
+  | reflectboolF :: ~ P -> reflectbool P false
+       
+  

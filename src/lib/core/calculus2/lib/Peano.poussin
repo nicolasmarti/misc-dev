@@ -1,0 +1,19 @@
+module Peano where
+
+  nat :: Set := | O :: nat | S :: nat -> nat
+
+  plus :: nat -> nat -> nat
+  plus O y := y
+  plus x O := x
+  plus (S x) y := S (plus x y)
+
+  Notation plus (+) left 50
+
+  minus :: nat -> nat -> nat
+  minus O _ := O
+  minus x O := x
+  minus (S x) (S y) := minus x y
+
+  Notation minus (-) left 50
+
+  
