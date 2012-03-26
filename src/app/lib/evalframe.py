@@ -156,6 +156,26 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         return
 
     def update_vars_callback(self, action, param):
+        try:
+            #print "update!"
+            if action == "update":
+                #print "param[0] :=" + str(param[0])
+                key = param[0]
+                if key in self.name2iter.keys():
+                    name = str(key)
+                    try:
+                        name = name + " := " + self.m_locals.getformula(key)[1:]
+                    except:
+                        pass
+                    try:
+                        name = name + " == " + str(self.m_locals.getvalue(key))
+                    except:
+                        pass
+                    self.treestore.set(self.name2iter[key], 0, name)
+        except Exception as e:
+            print "error := " + str(e)
+            pass
+
         self.update_vars()
 
     def update_vars(self):
