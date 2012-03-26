@@ -1,0 +1,28 @@
+
+EqDec (A :: Set) :: Set where
+       eqb :: A -> A -> bool
+       Notation eqb (==) left 100
+end
+
+ListEqDec {A :: Set} {H :: EqDec A} :: EqDec (List A) where
+  
+  eqb nil nil := true
+  cons hd1 tl1 (cons hd2 tl2) := (hd1 == hd2) && (tl1 == tl2)
+
+end
+
+eqb :: {A :: Set} -> {H :: EqDec A} -> A -> A -> bool
+eqb {A} {H} := H.eqb
+
+ListEqDec :: {A :: Set} -> {H :: EqDec A} -> EqDec (List A)
+
+EqType :: Set where
+       eqb :: A -> A -> bool
+end
+
+Coercion (b :: bool) :: EqType where
+   eqb ?b ?b := true
+   eqb _ _ := false
+end
+
+

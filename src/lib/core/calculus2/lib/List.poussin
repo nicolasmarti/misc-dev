@@ -1,0 +1,32 @@
+module List where
+
+  List [A:: Set] :: Set :=
+  | nil :: List A
+  | cons :: A -> List A -> List A
+
+end
+
+
+module EqDecList (A :: Set) where
+
+  Require EqDec A as EqA
+  
+  module EqDec (List A) where
+
+    nil == nil := true
+    cons hd1 tl1 == cons hd2 tl2 := (EqA.eqb hd1 hd2) && tl1 == tl2
+
+    eqP :: (l1 l2 :: List A) -> reflectbool (l1 = l2) (l1 == l2) 
+  
+  end
+
+end
+  
+(*
+EqDecList :: Set -> Set
+
+EqDecList.EqDec :: {A :: Set} -> {H :: EqDec A} -> EqDec (List A)
+
+(==) :: {A :: Set} -> {H: EqDec A} -> A -> A -> bool
+
+*)

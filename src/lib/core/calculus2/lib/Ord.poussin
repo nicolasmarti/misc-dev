@@ -11,7 +11,7 @@ module Ord (A :: Set) where
   | islt :: comparaison
   | isgt :: comparaison
 
-  module Eq comparaison where
+  module EqDec comparaison where
   
     eqb ?x ?x := true
     eqb _ _ := false

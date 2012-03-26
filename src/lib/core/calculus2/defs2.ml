@@ -80,11 +80,32 @@ type term = TSort of Sort * pos
 
 	    | App of term * (term * nature) array * pos * typeannotation
 
-	    | Match of term * (term array * term) array * pos  * typeannotation
+	    | Match of term * (term array * term) array * pos * typeannotation
 
-	    | Coercion of term * term * pos * typeannotation
+	    | TCoercion of term * term * typeannotation
 
 and typeannotation = NoTypeAnnotation
 		     | AnnotatedType of term
 		     | InferedType of term
     
+and value = Inductive of name array
+	    | Constructor
+	    | Axiom
+	    | Equation of (term * name option * term) array
+	    | Coercion
+
+and frame = {
+  name: name;
+  ty: term;
+  nature: nature;
+  (*role: role;*)
+  pos: pos;
+  
+  fvs: (index * term * term * name option * pos option) list;
+    
+  termstack: term list;
+  naturestack: nature list;
+  patternstack: pattern list;
+}
+
+and definition = (string, (symbol * term * value)) Hashtbl.t
