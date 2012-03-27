@@ -1,9 +1,38 @@
 nat :: Type := | O :: nat | S :: nat -> nat
 
 vector (A :: Type) :: nat -> Type :=
-| [[]] :: vector A O
-| (:) : right, 30 :: A -> {n :: nat} -> vector A n -> vector A (S n)
+| vnil :: vector A O
+| vcons :: A -> {n :: nat} -> vector A n -> vector A (S n)
+
+list (A :: Type) :: Type :=
+| nil :: list A
+| cons :: A -> list A -> list A
+
+length :: {A :: Type} -> (l :: list A) -> nat
+length nil := O
+length (cons _ tl) := S (length tl)
+
+list2vector :: {A :: Type} -> (l :: list A) -> vector A (length l)
+list2vector nil := vnil
+list2vector (cons hd tl) := vcons hd (list2vector tl)
+
+iota :: (start :: nat) -> (length :: nat) -> list nat
+iota start O := nil
+iota start (S n) := cons start (iota (S start) n)
 
 map :: {A B:: Type} -> {n :: nat} -> (A -> B) -> vector A n -> vector B n
-map f [] := []
-map f (hd : tl) := (f hd) : map f tl
+map f vnil := vnil
+map f (vcons hd tl) := vcons (f hd) (map f tl)
+
+plus :: nat -> nat -> nat
+plus O y := y
+plus x O := x
+plus (S x) y := S (plus x y)
+
+mul :: nat -> nat -> nat
+mul O x := O
+mul x O := O
+mul (S x) y := plus y (mul x y)
+
+f :: nat -> nat
+f := S
