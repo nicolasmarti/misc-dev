@@ -342,4 +342,6 @@ if __name__ == '__main__':
 
     win.show_all()
 
+    win.fullscreen()
+
     gtk.main()
