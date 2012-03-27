@@ -24,6 +24,11 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         self.table.show()
         self.add(self.table)
 
+        #add an entry 
+        self.entry = gtk.Entry()
+        self.entry.set_can_focus(True)
+        self.table.attach(self.entry, 0, 10, 0, 1)
+
         # build scrolled window and textview
         self.sw = gtk.ScrolledWindow()
         self.sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
@@ -32,7 +37,7 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         self.sw.add(self.textview)
         self.sw.show()
         self.textview.show()
-        self.table.attach(self.sw, 0, 10, 0, 8)
+        self.table.attach(self.sw, 0, 10, 1, 8)
 
         # build the result textview
         self.sw2 = gtk.ScrolledWindow()
@@ -46,19 +51,19 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         self.table.attach(self.sw2, 0, 10, 9, 12)
 
         # the button
-        self.button = gtk.Button(label="execute(C-c C-c)")
-        self.button.show()
-        self.table.attach(self.button, 3, 6, 8, 9)
-        self.button.connect("clicked", self.myexec, None)
+        #self.button = gtk.Button(label="execute(C-c C-c)")
+        #self.button.show()
+        #self.table.attach(self.button, 3, 6, 8, 9)
+        #self.button.connect("clicked", self.myexec, None)
 
-        self.button = gtk.Button(label="eval(C-c C-n)")
-        self.button.show()
-        self.table.attach(self.button, 0, 3, 8, 9)
-        self.button.connect("clicked", self.myeval, None)
+        #self.button = gtk.Button(label="eval(C-c C-n)")
+        #self.button.show()
+        #self.table.attach(self.button, 0, 3, 8, 9)
+        #self.button.connect("clicked", self.myeval, None)
 
-        self.button = gtk.Button(label="???")
-        self.button.show()
-        self.table.attach(self.button, 6, 10, 8, 9)
+        #self.button = gtk.Button(label="???")
+        #self.button.show()
+        #self.table.attach(self.button, 6, 10, 8, 9)
 
         if _locals == None:
             self.m_locals = locals()
@@ -87,7 +92,7 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
             iter = self.treestore.append(None, [d])
             self.name2iter[d] = iter
 
-        for i in [self, self.textview]:
+        for i in [self, self.textview, self.entry]:
             i.connect("key_press_event", self.key_pressed, None)
             i.connect("key_release_event", self.key_released, None)
         
@@ -111,10 +116,17 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
              )
             )
 
-        # C-c C-c -> eval
+        # C-c C-n -> eval
         self.keyactions.append(
             ([Set([65507, 99]), Set([65507,110])],
              lambda s: self.myeval()
+             )
+            )
+
+        # C-c C-d -> focus the entry
+        self.keyactions.append(
+            ([Set([65507, 99]), Set([65507,100])],
+             lambda s: self.entry.grab_focus()
              )
             )
 
@@ -146,13 +158,13 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         self.keypressed(event.keyval)
         if event.state & gtk.gdk.CONTROL_MASK: self.keypressed(self.ctrl)
         #print event.keyval
-        self.textview.grab_focus()
+        #self.textview.grab_focus()
         return
 
     def key_released(self, widget, event, data=None):        
         self.keyreleased(event.keyval)
         if not (event.state & gtk.gdk.CONTROL_MASK): self.keyreleased(self.ctrl)
-        self.textview.grab_focus()
+        #self.textview.grab_focus()
         return
 
     def update_vars_callback(self, action, param):
@@ -205,12 +217,16 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         return
 
     def myexec(self, data=None):
-        m_str = self.textbuffer.get_text(self.textbuffer.get_start_iter(), self.textbuffer.get_end_iter())
+        if self.entry.get_text() <> "":
+            m_str = self.entry.get_text() + " = \"=" + self.textbuffer.get_text(self.textbuffer.get_start_iter(), self.textbuffer.get_end_iter()).replace("\n", "\\\n").replace("\"","\\\"") + "\""
+        else:
+            m_str = self.textbuffer.get_text(self.textbuffer.get_start_iter(), self.textbuffer.get_end_iter())
         try:
             exec m_str in globals(), self.m_locals
             self.textbuffer2.set_text("")        
             self.m_start = self.textbuffer.get_end_iter()
             self.textbuffer.set_text("")
+            self.entry.set_text("")
         except BaseException as e:
             self.textbuffer2.set_text(str(e))        
             raise e
