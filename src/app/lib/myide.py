@@ -70,6 +70,8 @@ if __name__ == "__main__":
     #
 
     window.show_all()
+
+    window.fullscreen()
     
     main()
     sys.exit(0)

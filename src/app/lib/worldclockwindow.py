@@ -68,6 +68,8 @@ if __name__ == '__main__':
 
     win.show()
 
+    win.fullscreen()
+
     main()
 
     sys.exit(0)
