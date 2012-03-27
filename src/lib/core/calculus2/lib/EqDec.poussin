@@ -1,8 +1,8 @@
-module EqDec (A :: Set) where
+Require Eq
+Require Bool
+Require LogicDec
 
-  Require Eq
-  Require Bool
-  Require LogicDec
+class EqDec (A :: Set) where
   
   eqb :: A -> A -> bool
   

@@ -116,12 +116,15 @@ and frame = {
      - the type of the free variable
      - its corresponding value (by unification)
   *)
-  fvs: (index * term * term) list;
+  fvs: (index * term * term * name option) list;
 
   (* the stacks *)
   termstack: term list;
   naturestack: nature list;
   patternstack: pattern list;
+
+  (* the unifiable terms: couple of terms that unify (but for which we cannot loose the information) *)
+  unifiable_terms: (term * term) list;
   
 }
 
@@ -152,6 +155,7 @@ let empty_frame = {
   termstack = [];
   naturestack = [];
   patternstack = [];
+  unifiable_terms = [];
 }
 
 type doudou_error = NegativeIndexBVar of index

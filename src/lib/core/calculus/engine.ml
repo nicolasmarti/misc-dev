@@ -402,8 +402,19 @@ and unification_term_term (defs: defs) (ctxt: context ref) (te1: term) (te2: ter
 	  else raise (DoudouException (UnknownUnification (!ctxt, te1, te2)))
     ) with
       | DoudouException (UnknownUnification (ctxt', te1', te2')) as e when eq_term te1 te1' && eq_term te2 te2' -> (
+	(* we might look at the registered unification *)
+	(*
+	printf "unknown unification of:\n%s Vs %s\n" (term2string ctxt' te1) (term2string ctxt' te2); flush stdout;
+	List.iter (fun (hd1, hd2) ->
+	  printf "unifiable terms: %s Vs %s\n" (term2string ctxt' hd1) (term2string ctxt' hd2); flush stdout
+	) (get_unifiable ctxt');*)
+	if (List.fold_left (fun acc (hd1, hd2) ->
+	  if acc then true else
+	    if (eq_term te1 hd1 && eq_term te2 hd2) then true
+	    else (eq_term te1 hd2 && eq_term te2 hd1)
+	) false (get_unifiable ctxt')) then te2 else
 	try (
-	(* in this case we ask oracles if they can decide equality or inequality *)
+	  (* in this case we ask oracles if they can decide equality or inequality *)
 	  let ctxt' = ref ctxt' in
 	(* first let test equality *)
 	  let equality_assertion = term_equality defs ctxt' te1 te2 in
@@ -442,8 +453,8 @@ and unification_term_term (defs: defs) (ctxt: context ref) (te1: term) (te2: ter
 		| Right _ ->
 		(* we have a proof of inequality, we can return that the term cannot unify *)
 		  raise (DoudouException (NoUnification (!ctxt', te1', te2')))
-		| Left _ ->
-		(* no proof of equality, but maybe a proof of inequality *)
+		| Left _ ->		  
+		  (* no proof of equality, but maybe a proof of inequality *)
 		  raise e
 	) with
 	  | _ -> raise e
@@ -680,8 +691,8 @@ and typeinfer (defs: defs) (ctxt: context ref) (te: term) : term * term =
     | TVar (i, _) when i < 0 -> te, fvar_type !ctxt i
 
     | TName (s, pos) -> (
-      (* we first look for a bound variable *)
-      match bvar_lookup !ctxt s with
+      (* we first look for a variable *)
+      match var_lookup !ctxt s with
 	| Some i -> 
 	  let te = TVar (i, pos) in
 	  let ty = bvar_type !ctxt i in
@@ -859,9 +870,13 @@ and typeinfer (defs: defs) (ctxt: context ref) (te: term) : term * term =
   if !debug then printf "typeinfer result : %s :: %s\n" (term2string !ctxt (fst res)) (term2string !ctxt (snd res));
   res
 and typecheck_pattern (defs: defs) (ctxt: context ref) (p: pattern) (ty: term) : pattern * term * term =
-  let p', pte, pty = typeinfer_pattern defs ctxt p in
+
+  (*printf "typecheck pattern(1): %s Vs %s\n" (pattern2string !ctxt p) (term2string !ctxt ty); flush stdout;*)
+  let p', pte, pty = try typeinfer_pattern defs ctxt p with | DoudouException e -> printf "error %s\n" (error2string e); flush stdout; raise (DoudouException e) | e -> printf "c'est quoi ce bordel ???\n"; raise e in
   
-  let ty' = shift_term ty (pattern_size p') in
+  let ty' = try shift_term ty (pattern_size p') with | DoudouException e -> printf "error %s\n" (error2string e); flush stdout; raise (DoudouException e) | e -> printf "c'est quoi ce bordel ???\n"; raise e in
+
+  (*printf "typecheck pattern(2): %s :: %s Vs %s\n" (term2string !ctxt pte) (term2string !ctxt pty) (term2string !ctxt ty'); flush stdout;*)
 
   (* we try to detect if there is more implicite quantification in the infer type than the typechecked type *)
   if nb_implicit_arguments defs ctxt pty > nb_implicit_arguments defs ctxt ty then (
@@ -872,12 +887,17 @@ and typecheck_pattern (defs: defs) (ctxt: context ref) (p: pattern) (ty: term) :
     typecheck_pattern defs ctxt p'' ty
   ) else (
     push_terms ctxt [pte];
+
+
+    (*printf "typecheck pattern(3):\n%s|-\n %s Vs %s\n" (context2string !ctxt) (term2string !ctxt ty') (term2string !ctxt pty) ; flush stdout;*)
     let ty = unification_term_term defs ctxt ty' pty in
+
     let [pte] = pop_terms ctxt 1 in
     p', pte, ty  
   )
 
 and typeinfer_pattern (defs: defs) (ctxt: context ref) (p: pattern) : pattern * term * term =
+  (*printf "typeinfer_pattern: %s\n" (pattern2string !ctxt p); flush stdout;*)
   match p with
     | PApp ((s, spos), args, ty, pos) -> (
       let sty = constante_type defs s in
@@ -946,13 +966,14 @@ and typeinfer_pattern (defs: defs) (ctxt: context ref) (p: pattern) : pattern * 
       let ty = unification_term_term defs ctxt ty pty in
       PAlias (s, p, ty, pos), TVar (0, pos), ty
 
-
 (* typechecking for destructors where type of l.h.s := type of r.h.s *)
 and typecheck_equation (defs: defs) (ctxt: context ref) (lhs: pattern) (rhs: term) : pattern * term =
   (* we infer the pattern *)
   let lhs', lhste, lhsty = typeinfer_pattern defs ctxt lhs in
   (* close the value alias for pattern quantified variables *)
+  (*printf "typeinfer_pattern:\n%s\n" (context2string !ctxt); flush stdout;*)
   close_context ctxt;  
+  (*printf "typeinfer_pattern:\n%s\n%s :: %s\n" (context2string !ctxt) (term2string !ctxt lhste) (term2string !ctxt lhsty); flush stdout;*)
   (* and we typecheck the rhs *)
   let rhs, rhsty = typecheck defs ctxt rhs lhsty in
   let _ = pop_quantifications defs ctxt [] (pattern_size lhs') in

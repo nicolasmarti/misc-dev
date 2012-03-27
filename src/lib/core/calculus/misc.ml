@@ -315,5 +315,6 @@ let build_new_frame (s: symbol) ?(value: term = TVar (0, nopos)) ?(nature: natur
   naturestack = [];
   patternstack = [];
 
+  unifiable_terms = [];
 }
 

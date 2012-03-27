@@ -73,6 +73,18 @@ and shift_substitution (s: substitution) (delta: int) : substitution =
     with
       | DoudouException (Unshiftable_term _) -> acc
   ) s IndexMap.empty
+
+and lost_substitution (s: substitution) (delta: int) : substitution =
+  IndexMap.fold (fun key value acc -> 
+    try 
+      if key < 0 then (
+	ignore(shift_term value delta);
+	acc
+      ) else 
+	if key + delta < 0 then IndexMap.add key value acc else (ignore(shift_term value delta); acc) 
+    with
+      | DoudouException (Unshiftable_term _) -> IndexMap.add key value acc
+  ) s IndexMap.empty
       
 (* shift bvar index in a term *)
 and shift_term (te: term) (delta: int) : term =

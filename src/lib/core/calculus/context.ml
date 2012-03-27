@@ -58,20 +58,39 @@ let context_substitution (s: substitution) (ctxt: context) : context =
     { frame with
       ty = term_substitution s frame.ty;
       value = term_substitution s frame.value;
-      fvs = List.map (fun (index, ty, value) -> index, term_substitution s ty, term_substitution s value) frame.fvs;
+      fvs = List.map (fun (index, ty, value, name) -> index, term_substitution s ty, term_substitution s value, name) frame.fvs;
       termstack = List.map (term_substitution s) frame.termstack;
-      patternstack = List.map (pattern_substitution s) frame.patternstack
+      patternstack = List.map (pattern_substitution s) frame.patternstack;
+      
+      unifiable_terms = 
+	let lost = lost_substitution s (-1) in
+	List.map (fun (hd1, hd2) -> term_substitution s hd1, term_substitution s hd2) frame.unifiable_terms @ (List.map (fun (hd1, hd2) -> TVar (hd1, nopos), hd2) (IndexMap.bindings lost));
     }, shift_substitution s (-1)
   ) s ctxt
   )
 
+(* get all known unifiable *)
+let rec get_unifiable ?(level: int = 0) (ctxt: context) : (term * term) list =
+  match ctxt with
+    | [] -> []
+    | hd :: tl ->
+      List.map (fun (hd1, hd2) -> shift_term hd1 level, shift_term hd2 level) hd.unifiable_terms @ get_unifiable ~level:(level+1) tl
+;;
+
 (* retrieve the debruijn index of a bound var through its symbol *)
-let bvar_lookup (ctxt: context) (s: symbol) : index option =
+let var_lookup (ctxt: context) (s: symbol) : index option =
   let res = fold_stop (fun level frame ->
-    if symbol2string frame.symbol = symbol2string s then
-      Right level
-    else
-      Left (level + 1)
+    match fold_stop (fun _ (i, _, _, n) ->
+      match n with
+	| Some n when n = symbol2string s -> Right i
+	| _ -> Left ()
+    ) () frame.fvs with
+      | Left _ ->
+	if symbol2string frame.symbol = symbol2string s then
+	  Right level
+	else
+	  Left (level + 1)
+      | Right i -> Right i
   ) 0 ctxt in
   match res with
     | Left _ -> None
@@ -100,7 +119,7 @@ let bvar_type (ctxt: context) (i: index) : term =
 (* grab the value of a free var *)
 let fvar_value (ctxt: context) (i: index) : term =
   let lookup = fold_stop (fun level frame ->
-    let lookup = fold_stop (fun () (index, ty, value) -> 
+    let lookup = fold_stop (fun () (index, ty, value, name) -> 
       if index = i then Right value else Left ()
     ) () frame.fvs in
     match lookup with
@@ -114,7 +133,7 @@ let fvar_value (ctxt: context) (i: index) : term =
 (* grab the type of a free var *)
 let fvar_type (ctxt: context) (i: index) : term =
   let lookup = fold_stop (fun level frame ->
-    let lookup = fold_stop (fun () (index, ty, value) -> 
+    let lookup = fold_stop (fun () (index, ty, value, name) -> 
       if index = i then Right ty else Left ()
     ) () frame.fvs in
     match lookup with
@@ -129,7 +148,7 @@ let fvar_type (ctxt: context) (i: index) : term =
 let context2substitution (ctxt: context) : substitution =
   fst (List.fold_left (
     fun (s, level) frame -> 
-      let s = List.fold_left (fun s (index, ty, value) ->
+      let s = List.fold_left (fun s (index, ty, value, name) ->
 	IndexMap.add index (shift_term value level) s
       ) s frame.fvs in
       (s, level+1)
@@ -198,19 +217,19 @@ let rec pop_frames (ctxt: context) (nb: int) : context * context =
     ctxt, frame::frames
 
 (* we add a free variable *)
-let add_fvar (ctxt: context ref) (ty: term) : int =
+let add_fvar ?(name: name option = None) (ctxt: context ref) (ty: term) : int =
   let next_fvar_index = 
     match (fold_stop (fun acc frame ->
       match frame.fvs with
 	| [] -> Left acc
-	| (i, _, _)::_ -> Right (i - 1)
+	| (i, _, _, _)::_ -> Right (i - 1)
     ) (-1) !ctxt)
     with
       | Left i -> i
       | Right i -> i
   in
   let frame = List.hd !ctxt in
-  ctxt := ({ frame with fvs = (next_fvar_index, ty, TVar (next_fvar_index, nopos))::frame.fvs})::List.tl !ctxt;
+  ctxt := ({ frame with fvs = (next_fvar_index, ty, TVar (next_fvar_index, nopos), name)::frame.fvs})::List.tl !ctxt;
   next_fvar_index
 
 (* add definitions to a defs *)
@@ -274,27 +293,27 @@ let rec flush_fvars (defs: defs) (ctxt: context ref) (l: term list) : term list 
   (* we compute the fvars of the terms *)
   let lfvs = List.fold_left (fun acc te -> IndexSet.union acc (fv_term te)) IndexSet.empty l in
   (* and traverse the free variables *)
-  let (terms, fvs) = fold_cont (fun (terms, fvs) ((i, ty, te)::tl) ->
+  let (terms, fvs) = fold_cont (fun (terms, fvs) ((i, ty, te, name)::tl) ->
     match te with
       | TVar (i', _) when not (IndexSet.mem i' lfvs) ->
 	(* there is no value for this free variable, and it does not appear in the terms --> remove it *)
 	tl, (terms, fvs)
       | TVar (i', _) when IndexSet.mem i' lfvs ->
 	(* there is no value for this free variable, but it does appear in the terms --> keep it *)
-	tl, (terms, fvs @ [i, ty, te])
+	tl, (terms, fvs @ [i, ty, te, name])
       | _ -> 
       (* there is a value, we can get rid of the free var *)
 	(*if !debug then printf "flush_vars, rewrite %s --> %s\n" (term2string !ctxt (TVar (i, nopos))) (term2string !ctxt te);*)
 	let s = (IndexMap.singleton i te) in
 	let terms = List.map (fun hd -> term_substitution s hd) terms in
-	let tl = List.map (fun (i, ty, te) -> i, term_substitution s ty, term_substitution s te) tl in
+	let tl = List.map (fun (i, ty, te, name) -> i, term_substitution s ty, term_substitution s te, None) tl in
 	tl, (terms, fvs)
   ) (l, []) (List.rev hd.fvs) in
   (* here we are removing the free vars and putting them bellow only if they have no TVar 0 in their term/type *)
   (* first we shift them *)
-  let terms, fvs = List.fold_left (fun (terms, acc) (i, ty, te) ->
+  let terms, fvs = List.fold_left (fun (terms, acc) (i, ty, te, name) ->
     try 
-      terms, (acc @ [i, shift_term ty (-1), shift_term te (-1)])
+      terms, (acc @ [i, shift_term ty (-1), shift_term te (-1), name])
     with
       | DoudouException (Unshiftable_term _) ->
 	(* we have a free variable that has a type / value containing the symbol in hd -> 

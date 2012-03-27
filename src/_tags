@@ -2,9 +2,12 @@
 
 <lib/core>: include
 <lib/core/calculus>: include
-<lib/core/calculus2>: include
 <lib/core/primitives>: include
 <lib/core/pycalculus.{ml,byte,native}>: pkg_pycaml
+
+<lib/core/calculus2>: include
+<lib/core/calculus2/entry2.{ml,byte,native}>: pkg_str
+
 
 <lib/ibtws>: include
 <lib/strat>: include

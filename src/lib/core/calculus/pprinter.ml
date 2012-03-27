@@ -32,7 +32,7 @@ type pp_option = {
   show_position : bool;
 }
 
-let pp_option = ref {show_implicit = false; show_indices = false; show_position = false}
+let pp_option = ref {show_implicit = true; show_indices = true; show_position = false}
 
 (* transform a term into a box *)
 let rec term2token (ctxt: context) (te: term) (p: place): token =
@@ -364,7 +364,7 @@ let context2token (ctxt: context) : token =
 	     (map_remain (fun hd tl ->
 	       Box [Verbatim "(";
 		    Verbatim (symbol2string hd.symbol); Space 1; Verbatim ":="; Space 1; term2token (hd::tl) hd.value Alone; Space 1; Verbatim "::"; Space 1; term2token (hd::tl) hd.ty Alone; Newline;
-		    Box (intercalates [Verbatim ";"; Newline] (List.map (fun (i, ty, te) -> 
+		    Box (intercalates [Verbatim ";"; Newline] (List.map (fun (i, ty, te, name) -> 
 		      Box [Verbatim "(";
 			   Verbatim (string_of_int i); Space 1; Verbatim "=>"; Space 1; term2token (hd::tl) te Alone; Space 1; Verbatim "::"; Space 1; term2token (hd::tl) ty Alone;
 			   Verbatim ")"
