@@ -48,7 +48,7 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         self.textview2.show()
         self.sw2.add(self.textview2)
         self.sw2.show()
-        self.table.attach(self.sw2, 0, 10, 9, 12)
+        self.table.attach(self.sw2, 0, 10, 8, 12)
 
         # the button
         #self.button = gtk.Button(label="execute(C-c C-c)")
@@ -130,6 +130,20 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
              )
             )
 
+        # C-c C-d -> focus the entry
+        self.keyactions.append(
+            ([Set([65507, 99]), Set([65507,100])],
+             lambda s: self.entry.grab_focus()
+             )
+            )
+
+        # C-k -> clear buffer and entry
+        self.keyactions.append(
+            ([Set([65507, 107])],
+             lambda s: self.clear_buffers()
+             )
+            )
+
         # this is a historic of the commands
         self.hist = []
         # and a pointer
@@ -152,6 +166,12 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
             )
 
         self.get_settings().set_property("gtk-error-bell", False)
+
+    def clear_buffers(self):
+        self.textbuffer2.set_text("")  
+        self.entry.set_text("")  
+        self.textbuffer.set_text("")  
+        return
 
     # key callback
     def key_pressed(self, widget, event, data=None):        
