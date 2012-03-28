@@ -178,6 +178,10 @@ class Storegraph:
         # and finally return the value
         return self.values[key]
 
+    # remove a key
+    def remove_key(self, key):
+        self.__delitem__(key)
+
     #delete an element
     def __delitem__(self, key):
 
@@ -219,7 +223,7 @@ class Storegraph:
 
     # eval
     def store_eval(self, cmd):
-        eval(m_str, globals(), self)
+        return eval(cmd, globals(), self)
 
     # add a calllback
     def add_callback(self, f):
