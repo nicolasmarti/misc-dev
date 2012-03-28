@@ -93,7 +93,7 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
             iter = self.treestore.append(None, [d])
             self.name2iter[d] = iter
 
-        for i in [self, self.textview, self.entry]:
+        for i in [self.textview, self.entry]:
             i.connect("key_press_event", self.key_pressed, None)
             i.connect("key_release_event", self.key_released, None)
         
@@ -108,6 +108,14 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
             ([Set([65507, 120]), Set([65507,99])],
              lambda s: gtk.main_quit(),
              "close the application"
+             )
+            )
+
+        # C-c C-k -> execute
+        self.keyactions.append(
+            ([Set([65507, 99]), Set([65507,104])],
+             lambda s: self.m_locals.show_graph(),
+             "show the local store dependency graph"
              )
             )
 
@@ -184,9 +192,10 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
 
     # key callback
     def key_pressed(self, widget, event, data=None):        
+        
         self.keypressed(event.keyval)
         if event.state & gtk.gdk.CONTROL_MASK: self.keypressed(self.ctrl)
-        #print event.keyval
+        print str(event.keyval) + " from " + str(widget)
         #self.textview.grab_focus()
         return
 
