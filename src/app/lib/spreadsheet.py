@@ -227,6 +227,9 @@ class SpreadSheet:
   # we are setting a value
   def __setitem__(self, key, formula):
 
+    if key == "self":
+      return
+
     # first, as we change the formula of the cell
     # we remove its dependency to other cell
     self.remove_key_dependency(key)
@@ -272,9 +275,13 @@ class SpreadSheet:
 
 
   def __getitem__(self, key):
-    if not isinstance(key, str):
-      #print "key := " + str(key)
-      return self._cells.keys()[key]
+
+    if key == "self":
+      return self
+
+    #if not isinstance(key, str):
+    #  #print "key := " + str(key)
+    #  return self._cells.keys()[key]
 
     if self._debug:
       print "self.__getitem__(" + str(key) + ")"      
