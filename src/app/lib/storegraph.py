@@ -51,7 +51,7 @@ class Storegraph:
 
     # draw the graph
     def show_graph(self):
-        nx.draw_spectral(self.G)    
+        nx.draw(self.G)    
         plt.show()
 
 
@@ -217,6 +217,10 @@ class Storegraph:
     def keys(self):
         return self.state.keys()
 
+    # exec
+    def store_exec(self, cmd):
+        exec cmd in self._globals, self
+
 
 if __name__ == '__main__':
   from math import sin, pi
@@ -228,9 +232,9 @@ if __name__ == '__main__':
   store["asdf"] = "=caca + 4"
   store["coucou"] = "= asd + asdf + self[\"caca\"]"
 
-  store[32] = pi
+  store.store_exec("from math import sin, pi")
 
-  del store[32]
+  store["mypi"] = "= pi"
 
   store.show_graph()
   
