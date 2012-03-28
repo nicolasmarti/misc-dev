@@ -1,6 +1,7 @@
 import networkx as nx
 import matplotlib.pyplot as plt
 from threading import *
+from pickle import *
 
 # of model of storegraph: where a element might be described as a formula, and dependencies on element as directed graph edges
 class Storegraph:
@@ -94,8 +95,9 @@ class Storegraph:
         # we call the callbacks
         try:
             for i in self.callbacks:
-                i("update", (key, value))
-        except:
+                i("update", (key, self.values[key]))
+        except Exception as e:
+            print "callback update: " + str(e)
             pass
 
         # and we set all possible successor to dirty state
@@ -146,8 +148,6 @@ class Storegraph:
 
         else:
             self.state[key] = 0 
-
-
 
 
         return None
@@ -236,8 +236,24 @@ class Storegraph:
     def getvalue(self, key):
         return self.values[key]
 
+    # save
+    def save(self, file):
+        # dump the data
+        dump((self.G, self.formulas, self.values, self.mode, self.state), file, 1)
 
+    def load(self, file):
+        # load the data
+        
+        (self.G, self.formulas, self.values, self.mode, self.state) = load(file)
 
+        for i in nx.topological_sort(self.G):
+            print "node " + str(i) + ":= " + self.formulas[i]
+
+        # we update all nodes with a formula
+        for i in nx.topological_sort(self.G):
+            if self.formulas[i] <> None:
+                self.update(i)
+                
 
 if __name__ == '__main__':
   from math import sin, pi
@@ -249,9 +265,13 @@ if __name__ == '__main__':
   store["asdf"] = "=caca + 4"
   store["coucou"] = "= asd + asdf + self[\"caca\"]"
 
+  store.save("test.store")
+
   store.store_exec("from math import sin, pi")
 
   store["mypi"] = "= pi"
+
+  store.load("test.store")
 
   store.show_graph()
   

@@ -10,6 +10,8 @@ import re
 from string import join, ascii_uppercase
 
 from spreadsheet import *
+from storegraph import *
+
 
 from types import *
 
@@ -105,7 +107,11 @@ class Sheet(gtk.TreeView):
         gtk.TreeView.__init__(self)
 
         # the underlying ss
-        self.ss = SpreadSheet(callback = [self.setcell], _globals = globals())
+        if False:
+            self.ss = SpreadSheet(callback = [self.setcell], _globals = globals())
+        else:
+            self.ss = Storegraph(_globals = globals())
+            self.ss.add_callback(self.setcell)
 
         # numbers of row / columns
         self.numCols = numCols
@@ -286,6 +292,7 @@ class Sheet(gtk.TreeView):
         #self.store[path][user_data] = new_text
         
     def setcell(self, action, param):
+        #print "setcell " + str(action) + " " + str(param)
         if action == "update":
             key = param[0]
             value = param[1]
