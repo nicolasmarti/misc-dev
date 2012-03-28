@@ -51,7 +51,7 @@ class Storegraph:
 
     # draw the graph
     def show_graph(self):
-        nx.draw(self.G)    
+        nx.draw_spring(self.G)    
         plt.show()
 
 
