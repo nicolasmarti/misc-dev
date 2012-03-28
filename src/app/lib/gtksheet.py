@@ -329,6 +329,6 @@ if __name__ == '__main__':
 
     win.show_all()
 
-    win.fullscreen()
+    win.maximize()
 
     gtk.main()

@@ -559,7 +559,7 @@ class MyEditor:
 
         window.show()
 
-        window.fullscreen()
+        window.maximize()
 
         def key_pressed(widget, event, data=None):                
             print "MyEditor : " + str(event.keyval)

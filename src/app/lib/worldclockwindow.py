@@ -68,7 +68,7 @@ if __name__ == '__main__':
 
     win.show()
 
-    win.fullscreen()
+    win.maximize()
 
     main()
 

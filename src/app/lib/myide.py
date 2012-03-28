@@ -71,7 +71,7 @@ if __name__ == "__main__":
 
     window.show_all()
 
-    window.fullscreen()
+    window.maximize()
     
     main()
     sys.exit(0)
