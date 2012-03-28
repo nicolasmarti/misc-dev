@@ -195,7 +195,7 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         
         self.keypressed(event.keyval)
         if event.state & gtk.gdk.CONTROL_MASK: self.keypressed(self.ctrl)
-        print str(event.keyval) + " from " + str(widget)
+        #print str(event.keyval) + " from " + str(widget)
         #self.textview.grab_focus()
         return
 
