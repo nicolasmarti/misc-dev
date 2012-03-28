@@ -221,6 +221,10 @@ class Storegraph:
     def store_exec(self, cmd):
         exec cmd in self._globals, self
 
+    # eval
+    def store_eval(self, cmd):
+        eval(m_str, globals(), self)
+
 
 if __name__ == '__main__':
   from math import sin, pi

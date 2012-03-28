@@ -88,7 +88,7 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
 
         self.name2iter = dict()
 
-        for d in self.m_locals:
+        for d in self.m_locals.keys():
             iter = self.treestore.append(None, [d])
             self.name2iter[d] = iter
 
@@ -213,7 +213,7 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
     def update_vars(self):
         #print "update_vars"
         # is there new vars ?
-        for d in self.m_locals:
+        for d in self.m_locals.keys():
             if not d in self.name2iter.keys():
                 # a new local var
                 name = str(d)
@@ -230,7 +230,7 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
             # have to do those in ...
 
         for d in self.name2iter.keys():
-            if not d in self.m_locals:
+            if not d in self.m_locals.keys():
                 # remove the var
                 self.treestore.remove(self.name2iter[d])
 
