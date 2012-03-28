@@ -281,12 +281,13 @@ class Sheet(gtk.TreeView):
         #print "user_data := " + str(user_data) +"\n"
 
         try:
-            if new_text[0] == '=':
-                self.ss[colnum2colname(user_data - 1) + str(int(path) + 1)] = new_text
-            else:
-                self.ss[colnum2colname(user_data - 1) + str(int(path) + 1)] = eval(new_text)
-        except:
-            self.ss[colnum2colname(user_data - 1) + str(int(path) + 1)] = new_text
+            self.ss[colnum2colname(user_data - 1) + str(int(path) + 1)] = "=" + new_text
+            #if new_text[0] == '=':
+            #    self.ss[colnum2colname(user_data - 1) + str(int(path) + 1)] = new_text
+            #else:
+            #    self.ss[colnum2colname(user_data - 1) + str(int(path) + 1)] = self.ss.store_eval(new_text)
+        except Exception as e:
+            self.ss[colnum2colname(user_data - 1) + str(int(path) + 1)] = str(e)
 
         #print self.ss
         #self.store[path][user_data] = new_text
