@@ -9,6 +9,7 @@ import keybinding
 from sets import *
 
 import spreadsheet
+import storegraph
 
 import Calculus
 import Lisp
@@ -334,7 +335,11 @@ if __name__ == '__main__':
     sw.set_policy(gtk.POLICY_AUTOMATIC,
                   gtk.POLICY_AUTOMATIC)
 
-    ss = spreadsheet.SpreadSheet(_globals = globals())
+    if False:
+        ss = spreadsheet.SpreadSheet(_globals = globals())
+    else:
+        ss = storegraph.Storegraph(_globals = globals())
+
     evalf = EvalFrame(ss)
     sw.add(evalf)
 

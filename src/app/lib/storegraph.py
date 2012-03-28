@@ -25,7 +25,7 @@ class Storegraph:
         # callback:: action -> param -> ()
         # action == "update" -> param == (key, value)
         # action == "delete" -> param == key
-        self.callbacks = dict()
+        self.callbacks = []
 
         # the mode
         # 0 = lazy: the cell value is to be updated on demand
@@ -93,7 +93,7 @@ class Storegraph:
 
         # we call the callbacks
         try:
-            for i in self.callbacks(key):
+            for i in self.callbacks:
                 i("update", (key, value))
         except:
             pass
@@ -125,9 +125,7 @@ class Storegraph:
             self.mode[key] = 1
             # and dirty
             self.state[key] = 0
-            # without callbacks
-            self.callbacks[key] = []
-
+            
         # then we look if we are a formula or a value
         if isinstance(value, str) and len(value) > 0 and value[0] == '=':
             self.formulas[key] = value[1:]
@@ -201,14 +199,12 @@ class Storegraph:
         self.G.remove_node(key)
         del self.formulas[key]
         del self.values[key]
-        fs = self.callbacks[key]
-        del self.callbacks[key]
         del self.mode[key]
         del self.state[key]
 
         # we call the callbacks
         try:
-            for i in fs:
+            for i in self.callbacks:
                 i("delete", key)
         except:
             pass
@@ -224,6 +220,23 @@ class Storegraph:
     # eval
     def store_eval(self, cmd):
         eval(m_str, globals(), self)
+
+    # add a calllback
+    def add_callback(self, f):
+        self.callbacks.append(f)
+
+    # getformula
+    def getformula(self, key):
+        if self.formulas[key] == None:
+            return None
+        else:
+            return "=" + self.formulas[key]
+
+    # getvalue
+    def getvalue(self, key):
+        return self.values[key]
+
+
 
 
 if __name__ == '__main__':
