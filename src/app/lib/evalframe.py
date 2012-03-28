@@ -106,42 +106,48 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         # C-x C-c -> close the application
         self.keyactions.append(
             ([Set([65507, 120]), Set([65507,99])],
-             lambda s: gtk.main_quit()
+             lambda s: gtk.main_quit(),
+             "close the application"
              )
             )
 
         # C-c C-c -> execute
         self.keyactions.append(
             ([Set([65507, 99]), Set([65507,99])],
-             lambda s: self.myexec()
+             lambda s: self.myexec(),
+             "execute"
              )
             )
 
         # C-c C-n -> eval
         self.keyactions.append(
             ([Set([65507, 99]), Set([65507,110])],
-             lambda s: self.myeval()
+             lambda s: self.myeval(),
+             "evaluate"
              )
             )
 
         # C-c C-d -> focus the entry
         self.keyactions.append(
             ([Set([65507, 99]), Set([65507,100])],
-             lambda s: self.entry.grab_focus()
-             )
-            )
-
-        # C-c C-d -> focus the entry
-        self.keyactions.append(
-            ([Set([65507, 99]), Set([65507,100])],
-             lambda s: self.entry.grab_focus()
+             lambda s: self.entry.grab_focus(),
+             "focus the entry"
              )
             )
 
         # C-k -> clear buffer and entry
         self.keyactions.append(
             ([Set([65507, 107])],
-             lambda s: self.clear_buffers()
+             lambda s: self.clear_buffers(),
+             "clear buffer and entry"
+             )
+            )
+
+        # C-h -> show keybindings
+        self.keyactions.append(
+            ([Set([65507, 104])],
+             lambda s: self.textbuffer2.set_text(self.keycomments(gtk.gdk.keyval_name)),
+             "show keybindings"
              )
             )
 
@@ -155,14 +161,16 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         # C-up -> get the previous command
         self.keyactions.append(
             ([Set([65507, 65362])],
-             lambda s: self.hist_previous()
+             lambda s: self.hist_previous(),
+             "get previous command"
              )
             )
 
         # C-down -> get the next command
         self.keyactions.append(
             ([Set([65507, 65364])],
-             lambda s: self.hist_next()
+             lambda s: self.hist_next(),
+             "get next command"
              )
             )
 

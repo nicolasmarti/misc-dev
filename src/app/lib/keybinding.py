@@ -10,7 +10,7 @@ class KeyBinding:
         self.pressed_key = Set()
 
         # the set of keybinding
-        # basically a [([Set keycode]), self -> ()]
+        # basically a [([Set keycode]), self -> (), comment]
         self.keyactions = []
 
         # the latest longest valid key sequences
@@ -32,6 +32,23 @@ class KeyBinding:
         # discard the key from the set
         self.pressed_key.discard(keycode)
 
+
+    # this is a helper string
+    def keycomments(self, keycode2string):
+        l = []
+        for i in self.keyactions:
+            l2 = []
+            for j in i[0]:
+                l3 = []
+                for k in j:
+                    l3.append(keycode2string(k))
+                l2.append("-".join(l3))
+            try:
+                l.append(" ".join(l2) + ": " + i[2])
+            except:
+                print i
+                pass
+        return "\n".join(l)
 
     # the key manager: decide if the current list of entered key is a valid one,
     # and run the action
