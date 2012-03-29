@@ -205,7 +205,7 @@ class PG(gtksourceview2.View, keybinding.KeyBinding):
                 added.extend(i)
             toadd = []
             for i in dir(self.module):
-                if i[0] <> "_" and i not in added and i not in self.store.keys():
+                if i[0] <> "_" and i not in added and i not in self.store.formulas.keys():
                     toadd.append(i)
 
             for i in toadd:

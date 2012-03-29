@@ -123,7 +123,7 @@ class Storegraph:
         #print "evaluation_stack := " + str(self.evaluation_stack) 
         
         # first we create the key if it does not exists
-        if key not in self.state:
+        if key not in self.G.nodes():
 
             self.G.add_node(key)
             # by default we put value eager
@@ -219,7 +219,7 @@ class Storegraph:
                 
     # returns keys
     def keys(self):
-        return self.state.keys()
+        return self.G.nodes()
 
     # exec
     def store_exec(self, cmd):
