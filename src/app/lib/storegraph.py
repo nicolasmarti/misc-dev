@@ -81,10 +81,8 @@ class Storegraph:
                 self.values[key] = value
 
             except Exception as e:
-                # we have an exception, we pop from the evaluation stack
-                self.evaluation_stack.pop()
                 # and raise the exception
-                raise e
+                self.values[key] = e
 
             # we pop from the evaluation stack
             self.evaluation_stack.pop()
@@ -198,32 +196,27 @@ class Storegraph:
         if key not in self.state:
             raise KeyError
         
-        # we mark all successor as dirty
-        for i in nx.topological_sort(self.G, [key]):
-            if i <> key:
-                #print str(key) + " -> " + str(i)
-                self.state[i] = 0
-
         # we remove the key
-        self.G.remove_node(key)
+        #self.G.remove_node(key)
         del self.formulas[key]
         del self.values[key]
-        del self.mode[key]
-        del self.state[key]
+        #del self.mode[key]
+        #del self.state[key]
 
         # we call the callbacks
         for i in self.callbacks:
             try:
                 i("delete", key)
             except Exception as e:
-                print "callback delete " + key
-                if self.formulas[key] <> None:
-                    print ":= " + self.formulas[key]
-                print "value :=" + str(self.values[key])
-                print "callback :=" + str(i)
-                print "error: " + str(e)
                 pass
 
+        # we mark all successor as dirty
+        for i in nx.topological_sort(self.G, [key]):
+            if i <> key:
+                print str(key) + " -> " + str(i)
+                self.state[i] = 0
+                self.update(i)
+                
     # returns keys
     def keys(self):
         return self.state.keys()
