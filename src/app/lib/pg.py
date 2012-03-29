@@ -14,6 +14,8 @@ import pango
 from sets import *
 import keybinding
 
+import storegraph
+
 # some error dialog
 def error_dialog(parent, msg):
     dialog = gtk.MessageDialog(parent,

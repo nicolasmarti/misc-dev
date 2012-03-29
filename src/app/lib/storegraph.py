@@ -93,12 +93,17 @@ class Storegraph:
         self.state[key] = 1
 
         # we call the callbacks
-        try:
-            for i in self.callbacks:
+        for i in self.callbacks:
+            try:
                 i("update", (key, self.values[key]))
-        except Exception as e:
-            print "callback update: " + str(e)
-            pass
+            except Exception as e:
+                print "callback update " + key
+                if self.formulas[key] <> None:
+                    print ":= " + self.formulas[key]
+                print "value :=" + str(self.values[key])
+                print "callback :=" + str(i)
+                print "error: " + str(e)
+                pass
 
         # and we set all possible successor to dirty state
         for i in nx.topological_sort(self.G, [key]):
@@ -143,7 +148,7 @@ class Storegraph:
                 if i <> key:
                     #print str(key) + " -> " + str(i)
                     if self.mode[i] == 1 and self.state[i] == 0:
-                        print "__setitem__ update"
+                        #print "__setitem__ update"
                         self.update(i)
 
         else:
@@ -207,11 +212,17 @@ class Storegraph:
         del self.state[key]
 
         # we call the callbacks
-        try:
-            for i in self.callbacks:
+        for i in self.callbacks:
+            try:
                 i("delete", key)
-        except:
-            pass
+            except Exception as e:
+                print "callback delete " + key
+                if self.formulas[key] <> None:
+                    print ":= " + self.formulas[key]
+                print "value :=" + str(self.values[key])
+                print "callback :=" + str(i)
+                print "error: " + str(e)
+                pass
 
     # returns keys
     def keys(self):

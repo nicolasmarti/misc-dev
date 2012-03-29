@@ -69,6 +69,9 @@ if __name__ == "__main__":
 
     #
 
+    ss.ss.store_exec("import Calculus")
+    ss.ss.store_exec("import Lisp")
+
     window.show_all()
 
     window.maximize()

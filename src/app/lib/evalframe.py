@@ -11,9 +11,6 @@ from sets import *
 import spreadsheet
 import storegraph
 
-import Calculus
-import Lisp
-
 class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
     
     def __init__(self, _locals = None):
@@ -89,15 +86,11 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
 
         self.name2iter = dict()
 
-        for d in self.m_locals.keys():
-            iter = self.treestore.append(None, [d])
-            self.name2iter[d] = iter
+        self.vars = []
 
         for i in [self.textview, self.entry]:
             i.connect("key_press_event", self.key_pressed, None)
             i.connect("key_release_event", self.key_released, None)
-        
-
 
         # initialize super class keybing
         keybinding.KeyBinding.__init__(self)
@@ -231,7 +224,7 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
     def update_vars(self):
         #print "update_vars"
         # is there new vars ?
-        for d in self.m_locals.keys():
+        for d in self.vars:
             if not d in self.name2iter.keys():
                 # a new local var
                 name = str(d)
@@ -246,21 +239,20 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
                 iter = self.treestore.append(None, [name])
                 self.name2iter[d] = iter
             # have to do those in ...
-
-        for d in self.name2iter.keys():
-            if not d in self.m_locals.keys():
-                # remove the var
-                self.treestore.remove(self.name2iter[d])
-
+        
         return
 
     def myexec(self, data=None):
         if self.entry.get_text() <> "":
             m_str = self.entry.get_text() + " = \"=" + self.textbuffer.get_text(self.textbuffer.get_start_iter(), self.textbuffer.get_end_iter()).replace("\n", "\\\n").replace("\"","\\\"") + "\""
+
         else:
             m_str = self.textbuffer.get_text(self.textbuffer.get_start_iter(), self.textbuffer.get_end_iter())
         try:
-            exec m_str in globals(), self.m_locals
+            #exec m_str in globals(), self.m_locals
+            self.m_locals.store_exec(m_str)
+            if self.entry.get_text() <> "":
+                self.vars.append(self.entry.get_text())
             self.textbuffer2.set_text("")        
             self.m_start = self.textbuffer.get_end_iter()
             self.textbuffer.set_text("")
@@ -279,8 +271,8 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
     def myeval(self, data=None):
         m_str = self.textbuffer.get_text(self.textbuffer.get_start_iter(), self.textbuffer.get_end_iter())
         try:
-
-            self.textbuffer2.set_text(str(eval(m_str, globals(), self.m_locals)))        
+            res = self.m_locals.store_eval(m_str)
+            self.textbuffer2.set_text(str(res))        
             self.m_start = self.textbuffer.get_end_iter()
             self.textbuffer.set_text("")
 

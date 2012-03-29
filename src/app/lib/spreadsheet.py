@@ -4,9 +4,6 @@ from threading import *
 
 from pickle import *
 
-import Calculus
-import Lisp
-
 class SpreadSheet:
 
   def __init__(self, _globals = None, callback = [], file = None):

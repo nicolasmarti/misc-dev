@@ -55,7 +55,7 @@ class CellRender(gtk.CellRendererText):
         #print "editing_start"
         try:
             f = self.ss.getformula(colnum2colname(self.col - 1) + str(int(path) + 1))
-            editable.set_text(f)
+            editable.set_text(f[1:])
         except:
             pass
 
@@ -294,29 +294,30 @@ class Sheet(gtk.TreeView):
         
     def setcell(self, action, param):
         #print "setcell " + str(action) + " " + str(param)
-        if action == "update":
-            key = param[0]
-            value = param[1]
-            #print "ss callback: " + str((key, value))
-            findcol = re.findall("[A-Z]+?", key)
-            col = colname2colnum(join(findcol, ""))
+        try:
+            if action == "update":
+                key = param[0]
+                value = param[1]
+                findcol = re.findall("[A-Z]+?", key)
+                col = colname2colnum(join(findcol, ""))
             
-            findrow = re.findall("(\d|\.)+?", key)
-            row = int(join(findrow, ""))
+                findrow = re.findall("(\d|\.)+?", key)
+                row = int(join(findrow, ""))
 
-            #print str((col, row)) + " := " + str(value)
-            
-            self.store[row - 1][col] = str(value)
-            return
+                self.store[row - 1][col] = str(value)
+                return
 
-        if action == "delete":
-            key = param
-            findcol = re.findall("[A-Z]+?", key)
-            col = colname2colnum(join(findcol, ""))
+            if action == "delete":
+                key = param
+                findcol = re.findall("[A-Z]+?", key)
+                col = colname2colnum(join(findcol, ""))
             
-            findrow = re.findall("(\d|\.)+?", key)
-            row = int(join(findrow, ""))
-            self.store[row - 1][col] = ""
+                findrow = re.findall("(\d|\.)+?", key)
+                row = int(join(findrow, ""))
+                self.store[row - 1][col] = ""
+                return
+        except:
+            pass
             
 
 if __name__ == '__main__':
