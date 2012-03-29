@@ -69,8 +69,8 @@ if __name__ == "__main__":
 
     #
 
-    ss.ss.store_exec("import Calculus")
-    ss.ss.store_exec("import Lisp")
+    ss.ss["Calculus"] = "=__import__(\"Calculus\")"
+    ss.ss["Lisp"] = "=__import__(\"Lisp\")"
 
     window.show_all()
 

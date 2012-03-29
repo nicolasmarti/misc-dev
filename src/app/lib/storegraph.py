@@ -77,14 +77,14 @@ class Storegraph:
             # we evaluate the formula with ourselves as local
             try:
                 value = eval(self.formulas[key], self._globals, self)
+                # everything is fine, we update the value
+                self.values[key] = value
+
             except Exception as e:
                 # we have an exception, we pop from the evaluation stack
                 self.evaluation_stack.pop()
                 # and raise the exception
                 raise e
-
-            # everything is fine, we update the value
-            self.values[key] = value
 
             # we pop from the evaluation stack
             self.evaluation_stack.pop()
@@ -253,8 +253,17 @@ class Storegraph:
 
     # save
     def save(self, file):
-        # dump the data
-        dump((self.G, self.formulas, self.values, self.mode, self.state), file, 1)
+        # dump the data (we remove all values when there is a formula)
+        formulas = dict()
+        values = dict()
+        for i in self.G.nodes():
+            if self.formulas[i] <> None:
+                formulas[i] = self.formulas[i]
+            else:
+                formulas[i] = None
+                values[i] = self.values[i]
+
+        dump((self.G, formulas, values, self.mode, self.state), file, 1)
 
     def load(self, file):
         # load the data
@@ -262,14 +271,13 @@ class Storegraph:
         (self.G, self.formulas, self.values, self.mode, self.state) = load(file)
 
         for i in nx.topological_sort(self.G):
-            print "node " + str(i) + ":= " + self.formulas[i]
+            print "node " + str(i) + ":= " + str(self.formulas[i])
 
         # we update all nodes with a formula
         for i in nx.topological_sort(self.G):
             if self.formulas[i] <> None:
                 self.update(i)
-                
-
+    
 if __name__ == '__main__':
   from math import sin, pi
   
@@ -280,13 +288,15 @@ if __name__ == '__main__':
   store["asdf"] = "=caca + 4"
   store["coucou"] = "= asd + asdf + self[\"caca\"]"
 
-  store.save("test.store")
+  store["pi"] = "= __import__(\"math\").pi"
 
-  store.store_exec("from math import sin, pi")
+  store["doudou"] = "= pi + 3.14"
+
+  store.save(open('ss4.pkl', 'wb'))
 
   store["mypi"] = "= pi"
 
-  store.load("test.store")
+  store.load(open('ss4.pkl', 'rb'))
 
   store.show_graph()
   
