@@ -8,7 +8,6 @@ import keybinding
 
 from sets import *
 
-import spreadsheet
 import storegraph
 
 class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
@@ -67,6 +66,12 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
             self.m_locals = locals()
         else:
             self.m_locals = _locals
+
+        try:
+            self.m_locals.add_callback(self.update_vars_callback)
+        except:
+            pass                
+
 
         # tree view
         self.sw3 = gtk.ScrolledWindow()
@@ -344,15 +349,10 @@ if __name__ == '__main__':
     sw.set_policy(gtk.POLICY_AUTOMATIC,
                   gtk.POLICY_AUTOMATIC)
 
-    if False:
-        ss = spreadsheet.SpreadSheet(_globals = globals())
-    else:
-        ss = storegraph.Storegraph(_globals = globals())
+    ss = storegraph.Storegraph(_globals = globals())
 
     evalf = EvalFrame(ss)
     sw.add(evalf)
-
-    ss.add_callback(evalf.update_vars_callback)
 
     win = gtk.Window()
     win.add(sw)

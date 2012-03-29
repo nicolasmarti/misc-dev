@@ -9,7 +9,6 @@ from gtk import gdk
 import re
 from string import join, ascii_uppercase
 
-from spreadsheet import *
 from storegraph import *
 
 
@@ -105,16 +104,17 @@ class MyEntry(gtk.Entry):
 
 class Sheet(gtk.TreeView):
 
-    def __init__(self, numCols = 100, numRows = 100):
+    def __init__(self, numCols = 100, numRows = 100, ss = None):
 
         gtk.TreeView.__init__(self)
 
-        # the underlying ss
-        if False:
-            self.ss = SpreadSheet(callback = [self.setcell], _globals = globals())
-        else:
+        if ss == None:
             self.ss = Storegraph(_globals = globals())
-            self.ss.add_callback(self.setcell)
+        else:
+            self.ss = ss
+        
+        # the underlying ss        
+        self.ss.add_callback(self.setcell)
 
         # numbers of row / columns
         self.numCols = numCols
@@ -205,57 +205,6 @@ class Sheet(gtk.TreeView):
         # Esc 
         if event.keyval == 65307:
             gtk.main_quit()
-
-        # F2 -> save
-        if event.keyval == 65471:
-            self.filew = gtk.FileSelection("Save")
-
-            def close(w):
-                self.filew.hide()
-
-            def fileok(w):
-                self.filew.hide()                
-                self.ss.save(open(self.filew.get_filename(), 'wb'))
-            
-            self.filew.connect("destroy", close)
-            self.filew.ok_button.connect("clicked", fileok)
-
-            self.filew.show()
-
-        # F3 -> load
-        if event.keyval == 65472:
-            self.filew = gtk.FileSelection("Load")
-
-            def close(w):
-                self.filew.hide()
-
-            def fileok(w):
-                self.filew.hide()                
-                self.ss.load(open(self.filew.get_filename(), 'rb'))
-            
-            self.filew.connect("destroy", close)
-            self.filew.ok_button.connect("clicked", fileok)
-
-            self.filew.show()
-
-        # F4 -> import something
-        if event.keyval == 65473:
-
-            entry = MyEntry()
-            window = gtk.Window()
-
-            window.add(entry)
-            entry.show()
-            window.show()
-
-            def action(txt):
-                exec txt in globals()
-                window.hide()
-                return None
-            
-            entry.setquestion("module: ", action)
-
-            #window.hide()
 
     def key_released(self, widget, event, data=None):      
         try:

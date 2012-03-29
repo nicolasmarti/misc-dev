@@ -19,6 +19,7 @@ from worldclockwindow import *
 from evalframe import *
 from gtksheet import *
 from pg import *
+from storeframe import *
 
 gtk.gdk.threads_init()
 
@@ -31,6 +32,8 @@ if __name__ == "__main__":
 
     glock = Lock()
 
+    store = Storegraph(_globals = globals())
+
     notebook = gtk.Notebook()
     notebook.set_tab_pos(gtk.POS_TOP)
     
@@ -40,31 +43,36 @@ if __name__ == "__main__":
 
     #
 
+    storef = StoreFrame(store)
+    notebook.append_page(storef, gtk.Label(storef.get_label()))
+    
+    #
+
     sheetf = gtk.Frame()
+    ss = Sheet(ss = store)
+
     sw = gtk.ScrolledWindow()
     sw.set_shadow_type(gtk.SHADOW_ETCHED_IN)
     sw.set_policy(gtk.POLICY_AUTOMATIC,
                   gtk.POLICY_AUTOMATIC)
-    ss = Sheet()
+
     sw.add(ss)
     sheetf.add(sw)
-    sheetf.show()
     notebook.append_page(sheetf, gtk.Label("sheet"))
 
     #
 
-    evalf = EvalFrame(ss.ss)
+    evalf = EvalFrame(store)
     notebook.append_page(evalf, gtk.Label(evalf.get_label()))
-    ss.ss.add_callback(evalf.update_vars_callback)
 
     #
     
-    pgf1 = PGFrame("Calculus", ss.ss)
+    pgf1 = PGFrame("Calculus", store)
     notebook.append_page(pgf1, gtk.Label("Calculus"))
 
     #
 
-    pgf2 = PGFrame("Lisp", ss.ss)
+    pgf2 = PGFrame("Lisp", store)
     notebook.append_page(pgf2, gtk.Label("Lisp"))
 
     window.show_all()
