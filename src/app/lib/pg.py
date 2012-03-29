@@ -142,6 +142,9 @@ class PG(gtksourceview2.View, keybinding.KeyBinding):
         # this is the list of list of elements I added in the store
         self.added = []
 
+        # special function that I do not want to add to the store
+        self.reserved = dir(self.module)
+
         # syntax highlight
         #language = self.lm.guess_language("d.doudou")
         #if language:
@@ -208,7 +211,7 @@ class PG(gtksourceview2.View, keybinding.KeyBinding):
 
                 if i[0] <> "_" and i not in added and (i not in self.store.formulas.keys() or 
                                                        self.store.formulas[i] == self.modulename + "." + i
-                                                       ):
+                                                       ) and i not in self.reserved:
                     toadd.append(i)
 
             for i in toadd:
