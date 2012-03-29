@@ -30,6 +30,9 @@ def colname2colnum(s):
     
     res = 0
     for i in s:
+        if ord(i) < ord('A') or ord(i) > ord('Z'):
+            raise Exception
+        #print i
         res *= 26
         res += ord(i) - ord('A') + 1
 
@@ -301,10 +304,14 @@ class Sheet(gtk.TreeView):
                 findcol = re.findall("[A-Z]+?", key)
                 col = colname2colnum(join(findcol, ""))
             
+                if col == 0:
+                    return
+
                 findrow = re.findall("(\d|\.)+?", key)
                 row = int(join(findrow, ""))
 
                 self.store[row - 1][col] = str(value)
+                #print "sheet :=" + key
                 return
 
             if action == "delete":

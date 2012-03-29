@@ -263,8 +263,8 @@ class Storegraph:
         
         (self.G, self.formulas, self.values, self.mode, self.state) = load(file)
 
-        for i in nx.topological_sort(self.G):
-            print "node " + str(i) + ":= " + str(self.formulas[i])
+        #for i in nx.topological_sort(self.G):
+        #    print "node " + str(i) + ":= " + str(self.formulas[i])
 
         # we update all nodes with a formula
         for i in nx.topological_sort(self.G):
