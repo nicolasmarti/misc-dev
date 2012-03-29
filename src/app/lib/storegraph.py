@@ -213,7 +213,7 @@ class Storegraph:
         # we mark all successor as dirty
         for i in nx.topological_sort(self.G, [key]):
             if i <> key:
-                print str(key) + " -> " + str(i)
+                #print str(key) + " -> " + str(i)
                 self.state[i] = 0
                 self.update(i)
                 

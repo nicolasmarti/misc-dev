@@ -59,18 +59,13 @@ if __name__ == "__main__":
 
     #
     
-    pgf1 = PGFrame("Calculus")
+    pgf1 = PGFrame("Calculus", ss.ss)
     notebook.append_page(pgf1, gtk.Label("Calculus"))
 
     #
 
-    pgf2 = PGFrame("Lisp")
+    pgf2 = PGFrame("Lisp", ss.ss)
     notebook.append_page(pgf2, gtk.Label("Lisp"))
-
-    #
-
-    ss.ss["Calculus"] = "=__import__(\"Calculus\")"
-    ss.ss["Lisp"] = "=__import__(\"Lisp\")"
 
     window.show_all()
 

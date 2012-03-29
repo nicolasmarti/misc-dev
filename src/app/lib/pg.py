@@ -31,12 +31,20 @@ def error_dialog(parent, msg):
 # in the underlying python interpreter
 class PG(gtksourceview2.View, keybinding.KeyBinding):
     
-    def __init__(self, modulename):
+    def __init__(self, modulename, store = None):
 
         # store the module
-        exec ("import " + modulename) in globals()
-        self.module = eval (modulename)
-        print "module loaded: " + str(self.module)
+        self.store = store
+
+        if store == None:
+            exec ("import " + modulename) in globals()
+            self.module = eval (modulename)
+            print "module loaded: " + str(self.module)
+        else:
+            store[modulename] = "=__import__(\"" + modulename + "\")"
+            self.module = store[modulename]
+
+        self.modulename = modulename
 
         # first define a buffer and its language manager
         self.lm = gtksourceview2.LanguageManager()
@@ -130,7 +138,10 @@ class PG(gtksourceview2.View, keybinding.KeyBinding):
 
         # set source features
         self.buffer.set_highlight_matching_brackets(True)
-        
+
+        # this is the list of list of elements I added in the store
+        self.added = []
+
         # syntax highlight
         #language = self.lm.guess_language("d.doudou")
         #if language:
@@ -187,6 +198,21 @@ class PG(gtksourceview2.View, keybinding.KeyBinding):
         # and we set the cursor there
         self.buffer.place_cursor(enditer)
 
+        # update the store if necessary
+        if self.store <> None:
+            added = []
+            for i in self.added:
+                added.extend(i)
+            toadd = []
+            for i in dir(self.module):
+                if i[0] <> "_" and i not in added and i not in self.store.keys():
+                    toadd.append(i)
+
+            for i in toadd:
+                self.store[i] = "= " + self.modulename + "." + i 
+
+            self.added.append(toadd)
+
         #print self.startpos
         return True
 
@@ -222,6 +248,12 @@ class PG(gtksourceview2.View, keybinding.KeyBinding):
 
         # and we set the cursor
         self.buffer.place_cursor(newenditer)
+
+        # remove the added names
+        if self.store <> None:
+            last = self.added.pop()
+            for i in last:
+                del(self.store[i])
 
         #print self.startpos
         return True
@@ -318,10 +350,10 @@ class PG(gtksourceview2.View, keybinding.KeyBinding):
 
 class PGFrame(gtk.Frame):
 
-    def __init__(self, modulename):
+    def __init__(self, modulename, store = None):
         gtk.Frame.__init__(self)
 
-        srcview = PG(modulename)
+        srcview = PG(modulename, store)
 
         sw = gtk.ScrolledWindow()
         sw.set_shadow_type(gtk.SHADOW_ETCHED_IN)
