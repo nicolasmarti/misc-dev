@@ -205,11 +205,16 @@ class PG(gtksourceview2.View, keybinding.KeyBinding):
                 added.extend(i)
             toadd = []
             for i in dir(self.module):
-                if i[0] <> "_" and i not in added and i not in self.store.formulas.keys():
+                if i[0] <> "_" and i not in added and i in self.store.formulas.keys():
+                    print self.store.formulas[i] == " " + self.modulename + "." + i
+
+                if i[0] <> "_" and i not in added and (i not in self.store.formulas.keys() or 
+                                                       self.store.formulas[i] == " " + self.modulename + "." + i
+                                                       ):
                     toadd.append(i)
 
             for i in toadd:
-                self.store[i] = "= " + self.modulename + "." + i 
+                self.store[i] = "=" + self.modulename + "." + i 
 
             self.added.append(toadd)
 
