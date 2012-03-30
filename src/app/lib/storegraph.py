@@ -134,24 +134,21 @@ class Storegraph:
         # then we look if we are a formula or a value
         if isinstance(value, str) and len(value) > 0 and value[0] == '=':
             self.formulas[key] = value[1:]
+            # we update the value only if we are eager
+            if self.mode[key] == 1:
+                self.update(key)
+            else:
+                self.state[key] = 0 
+
         else:
             self.formulas[key] = None
             self.values[key] = value
 
-        # we update the value only if we are eager
-        if self.mode[key] == 1:
-            self.update(key)
-            # forall our successor that are eager and dirty we update
-            for i in nx.topological_sort(self.G, [key]):
-                if i <> key:
-                    #print str(key) + " -> " + str(i)
-                    if self.mode[i] == 1 and self.state[i] == 0:
-                        #print "__setitem__ update"
-                        self.update(i)
-
-        else:
-            self.state[key] = 0 
-
+        # forall our successor that are eager and dirty we update
+        for i in nx.topological_sort(self.G, [key]):
+            if i <> key:
+                if self.mode[i] == 1 and self.state[i] == 0:
+                    self.update(i)
 
         return None
 
