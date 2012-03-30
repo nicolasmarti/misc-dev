@@ -112,6 +112,8 @@ class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         return
 
     def callback(self, action, param):
+        #print "storeframe.callback(" + str(action) + ", " + str(param) + ")"
+
         if action == "update":
             key = param[0]
             
@@ -142,7 +144,7 @@ class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         if action == "delete":
             key = param
             if key in self.key2iter.keys():
-                self.liststore.remove(self.key2iter[d])
+                self.liststore.remove(self.key2iter[key])
                 del(self.key2iter[key])
 
 

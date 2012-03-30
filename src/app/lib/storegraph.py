@@ -205,6 +205,9 @@ class Storegraph:
             try:
                 i("delete", key)
             except Exception as e:
+                print "callback delete " + key
+                print "callback :=" + str(i)
+                print "error: " + str(e)
                 pass
 
         # we mark all successor as dirty
