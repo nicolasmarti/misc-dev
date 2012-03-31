@@ -32,6 +32,8 @@ from stockframe import *
 
 from gtksheet import *
 
+import storegraph
+
 gtk.gdk.threads_init()
 
 
@@ -52,45 +54,38 @@ if __name__ == "__main__":
     notebook = gtk.Notebook()
     notebook.set_tab_pos(gtk.POS_TOP)
     notebook.show()
-    
     window = WorldClockWindow(glock)
     window.start()
-    window.show()
     window.add(notebook)
 
-    evalf = EvalFrame()
-    evalf.show()
+    store = Storegraph(_globals = globals())
+
+    evalf = EvalFrame(store)
     notebook.append_page(evalf, gtk.Label(evalf.get_label()))
 
     sheetf = gtk.Frame()
-    ss = Sheet()
+    ss = Sheet(ss = store)
     sheetf.add(ss)
-    sheetf.show()
-    ss.show()
     notebook.append_page(sheetf, gtk.Label("sheet"))
 
     accountf = AccountFrame(glock)
-    accountf.show()
     th = Thread(target=accountf.loop)
     th.daemon = True
     th.start()
     notebook.append_page(accountf, gtk.Label(accountf.get_label()))
     
     portfoliof = PortfolioFrame(glock)
-    portfoliof.show()
     th = Thread(target=portfoliof.loop)
     th.daemon = True
     th.start()
     notebook.append_page(portfoliof, gtk.Label(portfoliof.get_label()))
 
     executionf = ExecutionFrame(glock)
-    executionf.show()
     executionf.daemon = True
     executionf.start()
     notebook.append_page(executionf, gtk.Label(executionf.get_label()))
 
     stockf = StockFrame(glock, "GS")
-    stockf.show()
     stockf.daemon = True
     stockf.start()
     notebook.append_page(stockf, gtk.Label(stockf.get_label()))
@@ -102,6 +97,8 @@ if __name__ == "__main__":
     o.accountStatus(True)
 
     #executionf.start()
+
+    window.show_all()
 
     main()
     
