@@ -819,8 +819,8 @@ con.register(globalconfig["Account"].handler1, 'UpdateAccountValue')
 con.register(globalconfig["Account"].handler2, 'UpdatePortfolio')
 con.register(globalconfig["Account"].handler3, 'UpdateAccountTime')
 
-con.register(globalconfig["Order"].handler2, message.OrderStatus)
-con.register(globalconfig["Order"].handler3, message.OpenOrder)
+con.register(globalconfig["Order"].handler2, "OrderStatus")
+con.register(globalconfig["Order"].handler3, "OpenOrder")
 
 con.register(globalconfig["Scanner"].handler1, 'ScannerData')
 con.register(globalconfig["Scanner"].handler2, 'ScannerDataEnd')
