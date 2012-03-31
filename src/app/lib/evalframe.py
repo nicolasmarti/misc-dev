@@ -344,18 +344,12 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
 
 if __name__ == '__main__':
     
-    sw = gtk.ScrolledWindow()
-    sw.set_shadow_type(gtk.SHADOW_ETCHED_IN)
-    sw.set_policy(gtk.POLICY_AUTOMATIC,
-                  gtk.POLICY_AUTOMATIC)
-
     ss = storegraph.Storegraph(_globals = globals())
 
     evalf = EvalFrame(ss)
-    sw.add(evalf)
 
     win = gtk.Window()
-    win.add(sw)
+    win.add(evalf)
 
     win.connect('destroy', lambda win: gtk.main_quit())
 
