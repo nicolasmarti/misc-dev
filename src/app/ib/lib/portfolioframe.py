@@ -69,7 +69,7 @@ class PortfolioFrame(gtk.Frame, Subscriber):
             gtk.gdk.threads_enter()
             #print "enter portfolio"
 
-            key = contract2str(event.msg[0])
+            key = event.msg[0]
 
             if not key in self.name2iter:
                 self.name2iter[key] = self.liststore.append()
