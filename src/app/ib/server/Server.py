@@ -17,12 +17,30 @@ from ib.ext.Order import Order
 from ib.opt import ibConnection, message
 from ib.ext.ScannerSubscription import ScannerSubscription
 from ib.ext.ExecutionFilter import ExecutionFilter
+from ib.lib import Cloneable
 
 # for pyro
 import Pyro.core
 import Pyro.naming
 import Pyro.constants
 import Pyro.EventService.Clients
+
+#
+def contract2str(c):
+    result = ""
+    result += c.m_symbol
+
+    if c.m_secType == "STK":
+        result += " STK(" + c.m_primaryExch + ")" 
+        
+    
+    if c.m_secType == "OPT" or c.m_secType == "FUT":
+        result += " " + c.m_expiry 
+    
+    if c.m_secType == "OPT":
+        result += " " + c.m_right + "Option  " + str(c.m_strike) + " " + c.m_currency
+    
+    return result
 
 
 # ISSUES to be solved:
@@ -68,8 +86,10 @@ class AccountServer(Pyro.EventService.Clients.Publisher):
         self.publish("UpdateAccountValue", (msg.values()[0], msg.values()[1], msg.values()[2], msg.values()[3]))
 
     def handler2(self, msg):
-        #print "update portfolio: " + str(msg)
-        self.publish("UpdatePortfolio", (msg.values()[0], msg.values()[1], msg.values()[2], msg.values()[3], msg.values()[4], msg.values()[5], msg.values()[6], msg.values()[7]))
+        print "update portfolio: " + str(msg)
+        print type(msg.values()[0])
+        print msg.values()[0].m_symbol
+        self.publish("UpdatePortfolio", (contract2str(msg.values()[0]), msg.values()[1], msg.values()[2], msg.values()[3], msg.values()[4], msg.values()[5], msg.values()[6], msg.values()[7]))
 
     def handler3(self, msg):
         #print "update account time: " + str(msg)
