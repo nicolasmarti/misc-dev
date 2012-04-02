@@ -107,7 +107,7 @@ class Storegraph:
 
         for i in self.named_callbacks:
             try:
-                self.__getitem__(i)("update", (key, self.values[key]))
+                self.__getitem__(i)(self, "update", (key, self.values[key]))
             except Exception as e:
                 print "callback update " + key
                 if self.formulas[key] <> None:
@@ -133,7 +133,7 @@ class Storegraph:
         if key == "self":
             raise KeyError
 
-        #print "__setitem__(" + str(key) + ", " + str(value) + ")__"
+        print "__setitem__(" + str(key) + ", " + str(value) + ")__"
         #print "evaluation_stack := " + str(self.evaluation_stack) 
         
         # first we create the key if it does not exists
@@ -173,7 +173,7 @@ class Storegraph:
 
             for i in self.named_callbacks:
                 try:
-                    self.__getitem__(i)("update", (key, self.values[key]))
+                    self.__getitem__(i)(self, "update", (key, self.values[key]))
                 except Exception as e:
                     print "callback update " + key
                     if self.formulas[key] <> None:
@@ -251,7 +251,7 @@ class Storegraph:
 
         for i in self.named_callbacks:
             try:
-                self.__getitem__(i)("delete", key)
+                self.__getitem__(i)(self, "delete", key)
             except Exception as e:
                 print "callback delete " + key
                 print "callback :=" + str(i)
