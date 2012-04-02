@@ -1,4 +1,5 @@
 open Pycaml
+open Nicerpy
 open Libparser
 
 module L = struct
@@ -31,8 +32,39 @@ module L = struct
   let eq_value v1 v2 = Lisp.eq v1 v2
 
   (* marshalling from/to python*)
-  let marshal_to_python v = None
-  let marshal_from_python o = None
+  let marshal_to_python v = 
+    match v with
+      | Lisp.String s -> Some (string_to_py s)
+      | Lisp.Int i -> Some (int_to_py i)
+      | Lisp.Float f -> Some (float_to_py f)
+      | _ -> None
+
+
+  (*
+    TupleType
+  | StringType
+  | IntType
+  | FloatType
+  | ListType
+  | BoolType
+  | NoneType
+  | CallableType
+  | ModuleType
+  | ClassType
+  | TypeType
+  | DictType
+  | NullType
+  | CamlpillType
+  | OtherType
+  | AnyType
+  
+  *)
+  let marshal_from_python o = 
+    match pytype o with
+      | StringType -> Some (Lisp.String (py_to_string o))
+      | IntType -> Some (Lisp.Int (py_to_int o))
+      | FloatType -> Some (Lisp.Float (py_to_float o))
+      | _ -> None
 
   (* application *)
   let apply f args = Lisp.eval (Lisp.List (f::(Array.to_list args))) !ctxt
