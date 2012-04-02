@@ -133,7 +133,7 @@ class Storegraph:
         if key == "self":
             raise KeyError
 
-        print "__setitem__(" + str(key) + ", " + str(value) + ")__"
+        #print "__setitem__(" + str(key) + ", " + str(value) + ")__"
         #print "evaluation_stack := " + str(self.evaluation_stack) 
         
         # first we create the key if it does not exists
