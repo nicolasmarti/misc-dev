@@ -291,6 +291,10 @@ class Storegraph:
     def add_named_callback(self, f):
         self.named_callbacks.append(f)
 
+    # del a named calllback
+    def del_named_callback(self, f):
+        self.named_callbacks.remove(f)
+
     # getformula
     def getformula(self, key):
         if self.formulas[key] == None:
