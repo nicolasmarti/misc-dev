@@ -27,6 +27,8 @@ class Storegraph:
         # action == "update" -> param == (key, value)
         # action == "delete" -> param == key
         self.callbacks = []
+        # the same, but callback are functions in the store here
+        self.named_callbacks = []
 
         # the mode
         # 0 = lazy: the cell value is to be updated on demand
@@ -103,6 +105,18 @@ class Storegraph:
                 print "error: " + str(e)
                 pass
 
+        for i in self.named_callbacks:
+            try:
+                self.__getitem__(i)("update", (key, self.values[key]))
+            except Exception as e:
+                print "callback update " + key
+                if self.formulas[key] <> None:
+                    print ":= " + self.formulas[key]
+                print "value :=" + str(self.values[key])
+                print "callback :=" + str(i)
+                print "error: " + str(e)
+                pass
+
         # and we set all possible successor to dirty state
         for i in nx.topological_sort(self.G, [key]):
             if i <> key:
@@ -148,6 +162,18 @@ class Storegraph:
             for i in self.callbacks:
                 try:
                     i("update", (key, self.values[key]))
+                except Exception as e:
+                    print "callback update " + key
+                    if self.formulas[key] <> None:
+                        print ":= " + self.formulas[key]
+                    print "value :=" + str(self.values[key])
+                    print "callback :=" + str(i)
+                    print "error: " + str(e)
+                    pass
+
+            for i in self.named_callbacks:
+                try:
+                    self.__getitem__(i)("update", (key, self.values[key]))
                 except Exception as e:
                     print "callback update " + key
                     if self.formulas[key] <> None:
@@ -223,6 +249,15 @@ class Storegraph:
                 print "error: " + str(e)
                 pass
 
+        for i in self.named_callbacks:
+            try:
+                self.__getitem__(i)("delete", key)
+            except Exception as e:
+                print "callback delete " + key
+                print "callback :=" + str(i)
+                print "error: " + str(e)
+                pass
+
         # we mark all successor as dirty
         for i in nx.topological_sort(self.G, [key]):
             if i <> key:
@@ -252,6 +287,10 @@ class Storegraph:
     def add_callback(self, f):
         self.callbacks.append(f)
 
+    # add a named calllback
+    def add_named_callback(self, f):
+        self.named_callbacks.append(f)
+
     # getformula
     def getformula(self, key):
         if self.formulas[key] == None:
@@ -275,12 +314,12 @@ class Storegraph:
                 formulas[i] = None
                 values[i] = self.values[i]
 
-        dump((self.G, formulas, values, self.mode, self.state), file, 1)
+        dump((self.G, formulas, values, self.mode, self.state, self.named_callbacks), file, 1)
 
     def load(self, file):
         # load the data
         
-        (self.G, self.formulas, self.values, self.mode, self.state) = load(file)
+        (self.G, self.formulas, self.values, self.mode, self.state, self.named_callbacks) = load(file)
 
         #for i in nx.topological_sort(self.G):
         #    print "node " + str(i) + ":= " + str(self.formulas[i])
