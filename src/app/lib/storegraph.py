@@ -216,6 +216,12 @@ class Storegraph:
                 #print str(key) + " -> " + str(i)
                 self.state[i] = 0
                 self.update(i)
+
+        # if there is not successor, we remove the node, and mode and state
+        if nx.topological_sort(self.G, [key]) == [key]:
+            self.G.remove_node(key)
+            del self.mode[key]
+            del self.state[key]
                 
     # returns keys
     def keys(self):
