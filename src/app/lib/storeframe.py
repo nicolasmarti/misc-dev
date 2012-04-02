@@ -12,6 +12,17 @@ import storegraph
 
 from types import *
 
+# some error dialog
+def error_dialog(parent, msg):
+    dialog = gtk.MessageDialog(parent,
+                               gtk.DIALOG_DESTROY_WITH_PARENT,
+                               gtk.MESSAGE_ERROR,
+                               gtk.BUTTONS_OK,
+                               msg)
+    dialog.run()
+    dialog.destroy()
+
+
 class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
 
     def __init__(self, store = None):
@@ -95,6 +106,22 @@ class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
             ([Set([65507, 120]), Set([65507,115])],
              lambda s: self.save(),
              "save a store"
+             )
+            )
+
+        # C-h -> show keybindings
+        self.keyactions.append(
+            ([Set([65507, 104])],
+             lambda s: error_dialog(self.get_toplevel(), self.keycomments(gtk.gdk.keyval_name)),
+             "show keybindings"
+             )
+            )
+
+        # C-c C-k -> show local store
+        self.keyactions.append(
+            ([Set([65507, 99]), Set([65507,104])],
+             lambda s: self.store.show_graph(),
+             "show the local store dependency graph"
              )
             )
 
