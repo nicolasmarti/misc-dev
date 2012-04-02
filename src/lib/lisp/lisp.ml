@@ -1236,7 +1236,7 @@ open Str;;
 
 let reserved_keywords = []
 
-let parse_name : name parsingrule = applylexingrule (regexp "[a-zA-Z][-a-zA-Z0-9]*", 
+let parse_name : name parsingrule = applylexingrule (regexp "[a-zA-Z][-a-zA-Z0-9_]*", 
 						     fun (s:string) -> 
 						       if List.mem s reserved_keywords then raise NoMatch else s
 )
