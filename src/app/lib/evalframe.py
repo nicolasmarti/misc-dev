@@ -109,7 +109,7 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
              )
             )
 
-        # C-c C-k -> execute
+        # C-c C-k -> show local store
         self.keyactions.append(
             ([Set([65507, 99]), Set([65507,104])],
              lambda s: self.m_locals.show_graph(),
@@ -220,6 +220,16 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
                     except:
                         pass
                     self.treestore.set(self.name2iter[key], 0, name)
+
+            #print "update!"
+            if action == "delete":
+                #print "param[0] :=" + str(param[0])
+                key = param
+                if key in self.name2iter.keys():
+                    self.treestore.remove(self.name2iter[key])
+                    del(self.name2iter[key])
+                    self.vars.remove(key)
+
         except Exception as e:
             print "error := " + str(e)
             pass
