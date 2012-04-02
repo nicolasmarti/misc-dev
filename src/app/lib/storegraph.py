@@ -144,6 +144,19 @@ class Storegraph:
             self.formulas[key] = None
             self.values[key] = value
 
+            # we call the callbacks
+            for i in self.callbacks:
+                try:
+                    i("update", (key, self.values[key]))
+                except Exception as e:
+                    print "callback update " + key
+                    if self.formulas[key] <> None:
+                        print ":= " + self.formulas[key]
+                    print "value :=" + str(self.values[key])
+                    print "callback :=" + str(i)
+                    print "error: " + str(e)
+                    pass
+
         # forall our successor that are eager and dirty we update
         for i in nx.topological_sort(self.G, [key]):
             if i <> key:
