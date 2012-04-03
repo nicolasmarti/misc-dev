@@ -270,6 +270,10 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         return
 
     def myexec(self, data=None):
+
+        self.hist.append(self.textbuffer.get_text(self.textbuffer.get_start_iter(), self.textbuffer.get_end_iter()))
+        self.histn = None
+
         if self.entry.get_text() <> "":
             m_str = self.entry.get_text() + " = \"=" + self.textbuffer.get_text(self.textbuffer.get_start_iter(), self.textbuffer.get_end_iter()).replace("\n", "\\\n").replace("\"","\\\"") + "\""
             self.vars.append(self.entry.get_text())
@@ -289,8 +293,6 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
             self.textbuffer2.set_text(str(e))        
             raise e
 
-        self.hist.append(m_str)
-        self.histn = None
 
         self.textview.grab_focus()
 
