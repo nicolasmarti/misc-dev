@@ -39,13 +39,13 @@ def colname2colnum(s):
 
 def key2cell(key):
 
-    print "name2cell: " + key
+    #print "name2cell: " + key
 
     findcol = re.findall("[A-Z]+?", key)
 
     col = colname2colnum(join(findcol, ""))
     
-    print "name2cell: col = " + str(col)
+    #print "name2cell: col = " + str(col)
     if col == 0:
         raise Exception
 
@@ -53,7 +53,7 @@ def key2cell(key):
     findrow = re.findall("(\d|\.)+?", key)
     row = int(join(findrow, ""))
 
-    print "name2cell: " + key + " ==> " + str((row - 1, col))
+    #print "name2cell: " + key + " ==> " + str((row - 1, col))
     
     return (row - 1, col)
 
