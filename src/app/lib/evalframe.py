@@ -217,7 +217,7 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         return
 
     def callback(self, action, param):
-        print "evalframe.callback(" + str(action) + ", " + str(param) + ")"
+        #print "evalframe.callback(" + str(action) + ", " + str(param) + ")"
 
         if action == "update" and param[0] in self.vars:
             key = param[0]
