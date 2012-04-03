@@ -297,7 +297,10 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         self.textview.grab_focus()
 
     def myeval(self, data=None):
-        m_str = self.textbuffer.get_text(self.textbuffer.get_start_iter(), self.textbuffer.get_end_iter())
+        self.hist.append(self.textbuffer.get_text(self.textbuffer.get_start_iter(), self.textbuffer.get_end_iter()))
+        self.histn = None
+
+        m_str = self.textbuffer.get_text(self.textbuffer.get_start_iter(), self.textbuffer.get_end_iter()).replace("\n", "\\\n")
         try:
             res = self.m_locals.store_eval(m_str)
             self.textbuffer2.set_text(str(res))        
@@ -309,8 +312,7 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
 
             self.textview.grab_focus()
 
-        self.hist.append(m_str)
-        self.histn = None
+
 
     def local_clicked(self, treeview, path, viewcolumn, data):
         #print "treeview: " + str(treeview) + " :: " + str(type(treeview))
