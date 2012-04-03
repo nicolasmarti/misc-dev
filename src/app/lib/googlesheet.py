@@ -77,11 +77,11 @@ class GoogleSheet():
             list_feed = self.gd_client.GetCellsFeed(curr_key, curr_wksht_id)
             for i, entry in enumerate(list_feed.entry):
               if isinstance(cell, str) and entry.title.text == cell:
-                print entry.content
+                #print entry.content
                 return (entry.content.text, entry.cell.inputValue)
               else:
                 if str(cell[0]) == entry.cell.col and str(cell[1]) == entry.cell.row:
-                  print entry.content
+                  #print entry.content
                   return (entry.content.text, entry.cell.inputValue)
 
         except Exception as e: 
