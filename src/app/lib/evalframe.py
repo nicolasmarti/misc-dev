@@ -8,6 +8,9 @@ import keybinding
 
 from sets import *
 
+import gtksourceview2
+import pango
+
 import storegraph
 
 class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
@@ -27,10 +30,20 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         self.table.attach(self.entry, 0, 10, 0, 1)
 
         # build scrolled window and textview
+        self.lm = gtksourceview2.LanguageManager()
+        self.textbuffer = gtksourceview2.Buffer()
+        self.textbuffer.set_data('languages-manager', self.lm)
+        self.textview = gtksourceview2.View(self.textbuffer)
+
+        self.textbuffer.set_highlight_matching_brackets(True)
+
+        language = self.lm.guess_language("p.py")
+        if language:
+            self.textbuffer.set_language(language)
+            self.textbuffer.set_highlight_syntax(True)
+
         self.sw = gtk.ScrolledWindow()
         self.sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-        self.textview = gtk.TextView()
-        self.textbuffer = self.textview.get_buffer()
         self.sw.add(self.textview)
         self.sw.show()
         self.textview.show()
