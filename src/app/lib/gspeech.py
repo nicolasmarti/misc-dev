@@ -6,9 +6,10 @@ import pygst		#for playing mp3 stream
 import gst		# " "
 
 
-def speack(words):
+def speack(phrase):
 
-    tts_string = '+'.join(words)    
+    #tts_string = '+'.join(words)    
+    tts_string = phrase.replace(" ", "+")
 
     music_stream_uri = 'http://translate.google.com/translate_tts?q=' + tts_string
     player = gst.element_factory_make("playbin", "player")
@@ -16,9 +17,6 @@ def speack(words):
     player.set_state(gst.STATE_PLAYING)
     
 
-
-#speack(["the", "strategy", "is", "losing", "money", ",", "you", "dumb", "ass", "!"])
-speack(["rock", "and", "roll", "doggy", "!"])
-
-
-time.sleep(12)
+if __name__ == '__main__':
+    speack("rock'n'roll doggy!!")
+    time.sleep(12)
