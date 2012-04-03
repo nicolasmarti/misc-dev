@@ -68,28 +68,41 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
             self.m_locals = _locals
 
         try:
-            self.m_locals.add_callback(self.update_vars_callback)
+            self.m_locals.add_callback(self.callback)
         except:
             pass                
 
+        # view
+        self.sw = gtk.ScrolledWindow()
+        self.sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
 
-        # tree view
-        self.sw3 = gtk.ScrolledWindow()
-        self.sw3.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-        self.treestore = gtk.TreeStore(str)
-        self.treeview = gtk.TreeView(self.treestore)
-        self.tvcolumn = gtk.TreeViewColumn('local name')
-        self.treeview.append_column(self.tvcolumn)
-        self.treeview.connect("row-activated", self.local_clicked, None)
-        self.cell = gtk.CellRendererText()
-        self.tvcolumn.pack_start(self.cell, True)
-        self.tvcolumn.add_attribute(self.cell, 'text', 0)
-        self.sw3.add(self.treeview)
-        self.table.attach(self.sw3, 10,16, 0, 12)
-        self.sw3.show()
+        self.liststore = gtk.ListStore(str, str, str, str)
+        self.treeview = gtk.TreeView(self.liststore)
+
+        self.fields = ["key", "formula", "type", "value"]
+
+        self.columns = range(0, len(self.fields))
+        self.cells = range(0, len(self.fields))                            
+
+        for i in range(0, len(self.fields)):
+            self.columns[i] = gtk.TreeViewColumn(self.fields[i])
+            self.treeview.append_column(self.columns[i])
+            self.cells[i] = gtk.CellRendererText()
+            self.columns[i].pack_start(self.cells[i], True)
+            self.columns[i].add_attribute(self.cells[i], 'text', i)
+
+        self.sw.add(self.treeview)
+        self.table.attach(self.sw, 10, 16, 0, 12)
+        self.sw.show()
         self.treeview.show()
 
-        self.name2iter = dict()
+        self.treeview.set_enable_search(False)
+        #self.liststore.set_enable_search(False)
+
+        # dict of name to iterator
+        self.key2iter = dict()
+
+        self.treeview.connect("row-activated", self.local_clicked, None)
 
         self.vars = []
 
@@ -203,81 +216,66 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         #self.textview.grab_focus()
         return
 
-    def update_vars_callback(self, action, param):
-        try:
-            #print "update!"
-            if action == "update":
-                #print "param[0] :=" + str(param[0])
-                key = param[0]
-                if key in self.name2iter.keys():
-                    name = str(key)
-                    try:
-                        name = name + " := " + self.m_locals.getformula(key)[1:]
-                    except:
-                        pass
-                    try:
-                        name = name + " == " + str(self.m_locals.getvalue(key))
-                    except:
-                        pass
-                    self.treestore.set(self.name2iter[key], 0, name)
+    def callback(self, action, param):
+        print "evalframe.callback(" + str(action) + ", " + str(param) + ")"
 
-            #print "update!"
-            if action == "delete":
-                #print "param[0] :=" + str(param[0])
-                key = param
-                if key in self.name2iter.keys():
-                    self.treestore.remove(self.name2iter[key])
-                    del(self.name2iter[key])
-                    self.vars.remove(key)
+        if action == "update" and param[0] in self.vars:
+            key = param[0]
+            
+            try:
+                formula = self.m_locals.formulas[key]
+            except:
+                formula = "no formula"
 
-        except Exception as e:
-            print "error := " + str(e)
-            pass
+            try:
+                keytype = type(self.m_locals.values[key])
+            except:
+                keytype = "no type"
 
-        self.update_vars()
+            try:
+                value = str(self.m_locals.values[key])
+            except:
+                value = "no value"
 
-    def update_vars(self):
-        #print "update_vars"
-        # is there new vars ?
-        for d in self.vars:
-            if not d in self.name2iter.keys():
-                # a new local var
-                name = str(d)
-                try:
-                    name = name + " := " + self.m_locals.getformula(d)[1:]
-                except:
-                    pass
-                try:
-                    name = name + " == " + str(self.m_locals.getvalue(d))
-                except:
-                    pass
-                iter = self.treestore.append(None, [name])
-                self.name2iter[d] = iter
-            # have to do those in ...
-        
+
+            if key not in self.key2iter.keys():
+                self.key2iter[key] = self.liststore.append()
+
+            self.liststore.set(self.key2iter[key], 0, str(key))
+            self.liststore.set(self.key2iter[key], 1, formula)
+            self.liststore.set(self.key2iter[key], 2, keytype)
+            self.liststore.set(self.key2iter[key], 3, value)
+
+        if action == "delete":
+            key = param
+            if key in self.key2iter.keys():
+                self.liststore.remove(self.key2iter[key])
+                del(self.key2iter[key])
+                self.vars.remove(key)
+
+
         return
 
     def myexec(self, data=None):
         if self.entry.get_text() <> "":
             m_str = self.entry.get_text() + " = \"=" + self.textbuffer.get_text(self.textbuffer.get_start_iter(), self.textbuffer.get_end_iter()).replace("\n", "\\\n").replace("\"","\\\"") + "\""
+            self.vars.append(self.entry.get_text())
 
         else:
             m_str = self.textbuffer.get_text(self.textbuffer.get_start_iter(), self.textbuffer.get_end_iter())
         try:
             #exec m_str in globals(), self.m_locals
             self.m_locals.store_exec(m_str)
-            if self.entry.get_text() <> "":
-                self.vars.append(self.entry.get_text())
             self.textbuffer2.set_text("")        
             self.m_start = self.textbuffer.get_end_iter()
             self.textbuffer.set_text("")
             self.entry.set_text("")
         except BaseException as e:
+            if self.entry.get_text() <> "":
+                self.vars.remove(self.entry.get_text())
             self.textbuffer2.set_text(str(e))        
             raise e
 
-        self.update_vars()
-                
         self.hist.append(m_str)
         self.histn = None
 
