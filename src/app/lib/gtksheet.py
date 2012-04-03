@@ -267,7 +267,7 @@ class Sheet(gtk.TreeView):
                 self.store[row][col] = ""
                 return
         except Exception as e:
-            print str(e)
+            #print str(e)
             pass
             
 
