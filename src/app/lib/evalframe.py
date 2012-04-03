@@ -197,7 +197,7 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
              )
             )
 
-        # this is a historic of the commands
+        # this is a historic of the commands and names
         self.hist = []
         # this is an historic of the formula
         self.histf = []
@@ -205,6 +205,7 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         self.histn = None
         # and a buffer for the current command
         self.savedcmd = None
+        self.savedvar = None
 
         # C-up -> get the previous command
         self.keyactions.append(
@@ -287,7 +288,7 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
 
     def myexec(self, data=None):
 
-        self.hist.append(self.textbuffer.get_text(self.textbuffer.get_start_iter(), self.textbuffer.get_end_iter()))
+        self.hist.append((self.entry.get_text(), self.textbuffer.get_text(self.textbuffer.get_start_iter(), self.textbuffer.get_end_iter())))
         self.histn = None
 
         if self.entry.get_text() <> "":
@@ -316,7 +317,7 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         self.textview.grab_focus()
 
     def myeval(self, data=None):
-        self.hist.append(self.textbuffer.get_text(self.textbuffer.get_start_iter(), self.textbuffer.get_end_iter()))
+        self.hist.append(("", self.textbuffer.get_text(self.textbuffer.get_start_iter(), self.textbuffer.get_end_iter())))
         self.histn = None
 
         m_str = self.textbuffer.get_text(self.textbuffer.get_start_iter(), self.textbuffer.get_end_iter()).replace("\n", "\\\n")
@@ -349,6 +350,7 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         # first time we look for the historic, or if the pointer is on the length of the hist, we need to save the current command
         if self.histn == None or self.histn == len(self.hist):
             self.savedcmd = self.textbuffer.get_text(self.textbuffer.get_start_iter(), self.textbuffer.get_end_iter())
+            self.savedvar = self.entry.get_text()
 
         # first set up the pointer
         if self.histn == None:
@@ -367,7 +369,8 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
 
 
         # change the current value of the buffer with the historical command
-        self.textbuffer.set_text(self.hist[self.histn])
+        self.textbuffer.set_text(self.hist[self.histn][1])
+        self.entry.set_text(self.hist[self.histn][0])
         return
         
     def hist_next(self):
@@ -381,8 +384,10 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         if self.histn >= len(self.hist): 
             self.histn = len(self.hist)
             self.textbuffer.set_text(self.savedcmd)
+            self.entry.set_text(self.savedvar)
         else:
-            self.textbuffer.set_text(self.hist[self.histn])
+            self.textbuffer.set_text(self.hist[self.histn][1])
+            self.entry.set_text(self.hist[self.histn][1])
         
         return
 
