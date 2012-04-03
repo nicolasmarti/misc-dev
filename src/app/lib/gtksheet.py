@@ -37,6 +37,28 @@ def colname2colnum(s):
 
     return res
 
+def key2cell(key):
+
+    print "name2cell: " + key
+
+    findcol = re.findall("[A-Z]+?", key)
+
+    col = colname2colnum(join(findcol, ""))
+    
+    print "name2cell: col = " + str(col)
+    if col == 0:
+        raise Exception
+
+    
+    findrow = re.findall("(\d|\.)+?", key)
+    row = int(join(findrow, ""))
+
+    print "name2cell: " + key + " ==> " + str((row - 1, col))
+    
+    return (row - 1, col)
+
+
+
 class CellRender(gtk.CellRendererText):
 
     def __init__(self, col, store, ss):
@@ -181,20 +203,13 @@ class Sheet(gtk.TreeView):
         renders = cursor[1].get_cell_renderers()
         col = renders[0].col
 
-        #self.set_cursor(str(row), cursor[1])
-        #print event.keyval
 
         title = str((row, col))
         self.firstcolumn.set_title(title)
         
-        #key = colnum2colname(col - 1) + str(row + 1)
-        #f = self.ss.getformula(key)
-        #win.set_title(str(f))
-
         # '='
         if event.keyval == 61:
             print (row, col)
-            #renders[0].start_editing(event, self, str(row), self.get_visible_rect(), self.get_visible_rect(), gtk.CELL_RENDERER_INSENSITIVE)
 
         # Delete
         if event.keyval == 65535:
@@ -226,23 +241,10 @@ class Sheet(gtk.TreeView):
             return 
 
     def edited_cb(self, cell, path, new_text, user_data = None):
-        #print "cell := " + str(cell)
-        #print "path := " + str(path)
-        #print "model[path][user_data] := " + str(self.store[path][user_data])
-        #print "new_text := " + new_text
-        #print "user_data := " + str(user_data) +"\n"
-
         try:
             self.ss[colnum2colname(user_data - 1) + str(int(path) + 1)] = "=" + new_text
-            #if new_text[0] == '=':
-            #    self.ss[colnum2colname(user_data - 1) + str(int(path) + 1)] = new_text
-            #else:
-            #    self.ss[colnum2colname(user_data - 1) + str(int(path) + 1)] = self.ss.store_eval(new_text)
         except Exception as e:
             self.ss[colnum2colname(user_data - 1) + str(int(path) + 1)] = str(e)
-
-        #print self.ss
-        #self.store[path][user_data] = new_text
         
     def setcell(self, action, param):
         #print "setcell " + str(action) + " " + str(param)
@@ -250,29 +252,22 @@ class Sheet(gtk.TreeView):
             if action == "update":
                 key = param[0]
                 value = param[1]
-                findcol = re.findall("[A-Z]+?", key)
-                col = colname2colnum(join(findcol, ""))
-            
-                if col == 0:
-                    return
 
-                findrow = re.findall("(\d|\.)+?", key)
-                row = int(join(findrow, ""))
+                (row, col) = key2cell(key)
 
-                self.store[row - 1][col] = str(value)
-                #print "sheet :=" + key
+                self.store[row][col] = str(value)
+
                 return
 
             if action == "delete":
                 key = param
-                findcol = re.findall("[A-Z]+?", key)
-                col = colname2colnum(join(findcol, ""))
-            
-                findrow = re.findall("(\d|\.)+?", key)
-                row = int(join(findrow, ""))
-                self.store[row - 1][col] = ""
+
+                (row, col) = ke2cell(key)
+
+                self.store[row][col] = ""
                 return
-        except:
+        except Exception as e:
+            print str(e)
             pass
             
 
