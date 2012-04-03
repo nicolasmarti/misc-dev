@@ -183,8 +183,24 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
              )
             )
 
+        # C-x C-f -> open a file
+        self.keyactions.append(
+            ([Set([65507, 120]), Set([65507,102])],
+             lambda s: s.openfile()
+             )
+            )
+
+        # C-x C-s -> save a file
+        self.keyactions.append(
+            ([Set([65507, 120]), Set([65507,115])],
+             lambda s: s.savefile()
+             )
+            )
+
         # this is a historic of the commands
         self.hist = []
+        # this is an historic of the formula
+        self.histf = []
         # and a pointer
         self.histn = None
         # and a buffer for the current command
@@ -280,6 +296,9 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
 
         else:
             m_str = self.textbuffer.get_text(self.textbuffer.get_start_iter(), self.textbuffer.get_end_iter())
+
+        self.histf.append(m_str)
+
         try:
             #exec m_str in globals(), self.m_locals
             self.m_locals.store_exec(m_str)
@@ -366,6 +385,52 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
             self.textbuffer.set_text(self.hist[self.histn])
         
         return
+
+    # open file
+    def openfile(self):
+        self.filew = gtk.FileSelection("File selection")
+    
+        def close(w):
+            self.filew.hide()
+
+        def fileok(w):
+            self.filew.hide()   
+            path = self.filew.get_filename()
+            try:
+                txt = open(path).read()
+            except:
+                return False
+
+            self.textbuffer.set_text(txt)
+
+            return True           
+            
+        self.filew.connect("destroy", close)
+        self.filew.ok_button.connect("clicked", fileok)
+
+        self.filew.show()
+
+    def savefile(self):
+        self.filew = gtk.FileSelection("File selection")
+    
+        def close(w):
+            self.filew.hide()
+
+        def fileok(w):            
+            self.filew.hide()   
+
+            f = open(self.filew.get_filename(), 'wb')
+
+            for i in self.histf:
+                f.write(i + "\n")               
+
+            return True           
+            
+        self.filew.connect("destroy", close)
+        self.filew.ok_button.connect("clicked", fileok)
+
+        self.filew.show()
+
 
 if __name__ == '__main__':
     
