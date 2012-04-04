@@ -133,6 +133,9 @@ class Storegraph:
         if key == "self":
             raise KeyError
 
+        if key == "key":
+            raise KeyError
+
         #print "__setitem__(" + str(key) + ", " + str(value) + ")__"
         #print "evaluation_stack := " + str(self.evaluation_stack) 
         
@@ -197,6 +200,9 @@ class Storegraph:
         #a special case: self
         if key == "self":
             return self
+
+        if key == "key":
+            return self.evaluation_stack[len(self.evaluation_stack) - 1]
 
         #print "__getitem__(" + str(key) + ")__"
         #print "evaluation_stack := " + str(self.evaluation_stack) 
@@ -332,6 +338,8 @@ class Storegraph:
         for i in nx.topological_sort(self.G):
             if self.formulas[i] <> None:
                 self.update(i)
+
+# this class 
     
 if __name__ == '__main__':
   from math import sin, pi
