@@ -43,6 +43,11 @@ if __name__ == "__main__":
 
     #
 
+    evalf = EvalFrame(store)
+    notebook.append_page(evalf, gtk.Label(evalf.get_label()))
+
+    #
+
     storef = StoreFrame(store)
     notebook.append_page(storef, gtk.Label(storef.get_label()))
     
@@ -59,11 +64,6 @@ if __name__ == "__main__":
     sw.add(ss)
     sheetf.add(sw)
     notebook.append_page(sheetf, gtk.Label("sheet"))
-
-    #
-
-    evalf = EvalFrame(store)
-    notebook.append_page(evalf, gtk.Label(evalf.get_label()))
 
     #
     
