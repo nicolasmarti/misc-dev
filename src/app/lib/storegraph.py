@@ -326,6 +326,7 @@ class Storegraph:
 
         dump((self.G, formulas, values, self.mode, self.state, self.named_callbacks), file, 1)
 
+    # load
     def load(self, file):
         # load the data
         
@@ -339,7 +340,63 @@ class Storegraph:
             if self.formulas[i] <> None:
                 self.update(i)
 
-# this class 
+# this class represent a set of key as an array
+class StoreArray:
+    # constructor
+    def __init__(self, _globals = None, _locals = None, formula = None, name = None):
+
+        # set the name
+        if name == None:
+            raise Exception
+
+        self.name = name
+
+        # defining a global
+        if _globals == None:
+            self._globals = globals()
+        else:
+            self._globals = _globals
+
+        # and a local global
+        if _locals == None:
+            self._locals = Storegraph(_globals = self._globals())
+        else:
+            self._locals = _locals
+
+        # setup the callback
+        self._locals.add_callback(self.callback)
+
+        # we set the formula
+        self.formula = formula
+
+        # we set the size
+        self.size = 0
+
+    def __len__(self):
+        return self.size
+
+    def callback(self, msg, param):
+        print "StoreArray.callback" + str((msg, param))
+        return
+
+    def __setitem__(self, key, item):
+        if not (isinstance(key, int)) or key >= self.size:
+            raise KeyError
+
+        self._locals[(self.name, key)] = item
+
+        return 
+
+    def __getitem__(self, key):
+        if not (isinstance(key, int)) or key >= self.size:
+            raise KeyError
+        
+        return self._locals[(self.name, key)]
+    
+    def append(self, value):
+        self._locals[(self.name, self.size)] = value
+        self.size += 1
+        
     
 if __name__ == '__main__':
   from math import sin, pi
