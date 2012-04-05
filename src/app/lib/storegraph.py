@@ -397,6 +397,13 @@ class StoreArray:
         self._locals[(self.name, self.size)] = value
         self.size += 1
         
+    def pop(self):
+        self.size -= 1
+        value = self._locals[(self.name, self.size)]
+        self._locals.__delitem__((self.name, self.size))
+        return value
+        
+
     
 if __name__ == '__main__':
   from math import sin, pi
