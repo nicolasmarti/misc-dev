@@ -79,6 +79,8 @@ class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
 
         self.treeview.set_enable_search(False)
 
+        self.treeview.connect("row-activated", self.local_clicked, None)
+
         self.treeview.set_grid_lines(gtk.TREE_VIEW_GRID_LINES_HORIZONTAL)
 
         # initialize super class keybing
@@ -208,6 +210,12 @@ class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         self.filew.ok_button.connect("clicked", fileok)
 
         self.filew.show()
+
+    def local_clicked(self, treeview, path, viewcolumn, data):
+
+        piter = treeview.get_model().get_iter(path)
+        varname = str(treeview.get_model().get_value(piter, 0))
+        self.store.update(varname)
 
 
 if __name__ == '__main__':

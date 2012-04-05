@@ -204,6 +204,9 @@ class Storegraph:
         if key == "key":
             return self.evaluation_stack[len(self.evaluation_stack) - 1]
 
+        if key == "value":
+            return self.values[self.evaluation_stack[len(self.evaluation_stack) - 1]]
+
         #print "__getitem__(" + str(key) + ")__"
         #print "evaluation_stack := " + str(self.evaluation_stack) 
 
@@ -231,7 +234,7 @@ class Storegraph:
     def __delitem__(self, key):
 
         #a special case: self
-        if key == "self":
+        if key in ["self", "key", "value"]:
             raise KeyError
         
         # if we do not have the key, then we leave
