@@ -215,8 +215,14 @@ class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
 
         piter = treeview.get_model().get_iter(path)
         varname = str(treeview.get_model().get_value(piter, 0))
-        self.store.update(varname)
-
+        try:
+            val = self.store[varname]
+            if isinstance(val, ModuleType):
+                reload(val)
+            else:
+                self.store.update(varname)
+        except:
+            self.store.update(varname)
 
 if __name__ == '__main__':
     
