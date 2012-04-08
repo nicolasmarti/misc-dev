@@ -241,7 +241,7 @@ class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         try:
             val = self.store[varname]
             if isinstance(val, ModuleType):
-                print "is a module"
+                #print "is a module"
                 reload(val)
                 self.store.update(varname)              
                 
