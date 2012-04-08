@@ -41,7 +41,7 @@ class PG(gtksourceview2.View, keybinding.KeyBinding):
             self.module = eval (modulename)
             print "module loaded: " + str(self.module)
         else:
-            store[modulename] = "=__import__(\"" + modulename + "\")"
+            self.store[modulename] = "=__import__(\"" + modulename + "\")"
             self.module = store[modulename]
 
         self.modulename = modulename

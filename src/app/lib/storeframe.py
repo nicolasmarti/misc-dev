@@ -30,7 +30,7 @@ class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         self.set_label("Store")
 
         # build a table to put all my stuffs
-        self.table = gtk.Table(12, 16, True)
+        self.table = gtk.Table(13, 16, True)
         self.table.show()
         self.add(self.table)
 
@@ -83,6 +83,12 @@ class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
 
         self.treeview.set_grid_lines(gtk.TREE_VIEW_GRID_LINES_HORIZONTAL)
 
+        # an entry for loading modules
+        self.entry = gtk.Entry()
+        self.entry.set_can_focus(True)
+        self.table.attach(self.entry, 0, 16, 12, 13)
+        self.entry.connect("activate", self.load_module, None)
+
         # initialize super class keybing
         keybinding.KeyBinding.__init__(self)
         self.ctrl = 65507
@@ -127,6 +133,15 @@ class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
              )
             )
 
+        # C-d -> remove a var
+        self.keyactions.append(
+            ([Set([65507, 100])],
+             lambda s: self.del_var(),
+             "delete a variable"
+             )
+            )
+
+
     # key callback
     def key_pressed(self, widget, event, data=None):        
         
@@ -157,8 +172,16 @@ class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
                 keytype = "no type"
 
             try:
-                value = str(self.store.values[key])
-            except:
+                value = self.store.values[key]
+                if isinstance(value, ModuleType):                    
+                    l = self.store.store_eval("dir(" + key + ")")
+                    value = str(l)
+                    #print l
+                else:
+                    value = str(value)
+
+            except Exception as e:
+                print e
                 value = "no value"
 
 
@@ -218,11 +241,27 @@ class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         try:
             val = self.store[varname]
             if isinstance(val, ModuleType):
+                print "is a module"
                 reload(val)
+                self.store.update(varname)              
+                
             else:
                 self.store.update(varname)
-        except:
+        except Exception as e:
+            print e
             self.store.update(varname)
+
+    def load_module(self, widget, param):
+        self.store[self.entry.get_text()] = "=__import__(\"" + self.entry.get_text() + "\")"
+        self.entry.set_text("")
+        return
+
+    def del_var(self):
+        path = self.treeview.get_cursor()[0]
+        if path <> None:
+            piter = self.treeview.get_model().get_iter(path)
+            varname = str(self.treeview.get_model().get_value(piter, 0))
+            self.store.__delitem__(varname)
 
 if __name__ == '__main__':
     

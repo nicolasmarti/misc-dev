@@ -197,6 +197,14 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
              )
             )
 
+        # C-d -> remove a var
+        self.keyactions.append(
+            ([Set([65507, 100])],
+             lambda s: self.del_var(),
+             "delete a variable"
+             )
+            )
+
         # this is a historic of the commands and names
         self.hist = []
         # this is an historic of the formula
@@ -364,7 +372,7 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
 
         # and make sure it points to something
         if self.histn >= len(self.hist):
-            self.hist = None
+            self.histn = None
             return
 
 
@@ -435,6 +443,14 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         self.filew.ok_button.connect("clicked", fileok)
 
         self.filew.show()
+
+    def del_var(self):
+        print self.treeview.get_cursor()[0]
+        path = self.treeview.get_cursor()[0]
+        if path <> None:
+            piter = self.treeview.get_model().get_iter(path)
+            varname = str(self.treeview.get_model().get_value(piter, 0))
+            self.store.__delitem__(varname)
 
 
 if __name__ == '__main__':
