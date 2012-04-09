@@ -295,7 +295,7 @@ class Storegraph:
     #delete an element
     def __delitem__(self, key):
 
-        print "__delitem__(" + str(key) + ")__"
+        #print "__delitem__(" + str(key) + ")__"
 
         #a special case: self
         if key in ["self", "key", "value", "col", "row"]:
