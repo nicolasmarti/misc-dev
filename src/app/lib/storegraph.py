@@ -3,6 +3,52 @@ import matplotlib.pyplot as plt
 from threading import *
 from pickle import *
 
+from string import join, ascii_uppercase
+import re
+
+def colnum2colname(n):
+    
+    res = ""
+
+    if n / 26 > 0:
+        res += colnum2colname (n / 26 - 1)
+        
+    res += ascii_uppercase[n%26]
+
+    return res
+
+def colname2colnum(s):
+    
+    res = 0
+    for i in s:
+        if ord(i) < ord('A') or ord(i) > ord('Z'):
+            raise Exception
+        #print i
+        res *= 26
+        res += ord(i) - ord('A') + 1
+
+    return res
+
+def key2cell(key):
+
+    #print "name2cell: " + key
+
+    findcol = re.findall("[A-Z]+?", key)
+
+    col = colname2colnum(join(findcol, ""))
+    
+    #print "name2cell: col = " + str(col)
+    if col == 0:
+        raise Exception
+
+    
+    findrow = re.findall("(\d|\.)+?", key)
+    row = int(join(findrow, ""))
+
+    #print "name2cell: " + key + " ==> " + str((row - 1, col))
+    
+    return (row - 1, col)
+
 # of model of storegraph: where a element might be described as a formula, and dependencies on element as directed graph edges
 class Storegraph:
 
@@ -207,6 +253,22 @@ class Storegraph:
         if key == "value":
             return self.values[self.evaluation_stack[len(self.evaluation_stack) - 1]]
 
+        if key == "row":
+            try:
+                mkey = self.evaluation_stack[len(self.evaluation_stack) - 1]                
+                return key2cell(mkey)[0]
+            except Exception as e:
+                print e
+                return None
+
+        if key == "col":
+            try:
+                mkey = self.evaluation_stack[len(self.evaluation_stack) - 1]                
+                return key2cell(mkey)[1]
+            except Exception as e:
+                print e
+                return None
+
         #print "__getitem__(" + str(key) + ")__"
         #print "evaluation_stack := " + str(self.evaluation_stack) 
 
@@ -233,8 +295,10 @@ class Storegraph:
     #delete an element
     def __delitem__(self, key):
 
+        print "__delitem__(" + str(key) + ")__"
+
         #a special case: self
-        if key in ["self", "key", "value"]:
+        if key in ["self", "key", "value", "col", "row"]:
             raise KeyError
         
         # if we do not have the key, then we leave

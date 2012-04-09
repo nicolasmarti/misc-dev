@@ -36,3 +36,10 @@ mul (S x) y := plus y (mul x y)
 
 f :: nat -> nat
 f := S
+
+revacc :: {A :: Type} -> list A -> list A -> list A
+revacc nil l := l
+revacc (cons hd tl) l := revacc tl (cons hd l)
+
+rev :: {A :: Type} -> list A -> list A
+rev l := revacc l nil
