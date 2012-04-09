@@ -72,8 +72,14 @@ class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         # dict of name to iterator
         self.key2iter = dict()
 
+        # an entry for loading modules
+        self.entry = gtk.Entry()
+        self.entry.set_can_focus(True)
+        self.table.attach(self.entry, 0, 16, 12, 13)
+        self.entry.connect("activate", self.load_module, None)
+
         # key event
-        for i in [self.treeview]:
+        for i in [self.treeview, self.entry]:
             i.connect("key_press_event", self.key_pressed, None)
             i.connect("key_release_event", self.key_released, None)
 
@@ -83,11 +89,6 @@ class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
 
         self.treeview.set_grid_lines(gtk.TREE_VIEW_GRID_LINES_HORIZONTAL)
 
-        # an entry for loading modules
-        self.entry = gtk.Entry()
-        self.entry.set_can_focus(True)
-        self.table.attach(self.entry, 0, 16, 12, 13)
-        self.entry.connect("activate", self.load_module, None)
 
         # initialize super class keybing
         keybinding.KeyBinding.__init__(self)
