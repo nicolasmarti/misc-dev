@@ -176,13 +176,11 @@ class Storegraph:
     def __setitem__(self, key, value):
 
         #a special case: self
-        if key == "self":
+        if key in ["self", "key", "value", "col", "row"]:
             raise KeyError
 
-        if key == "key":
-            raise KeyError
 
-        #print "__setitem__(" + str(key) + ", " + str(value) + ")__"
+        #print "__setitem__(" + str(key) + ", " + str(value) + ")"
         #print "evaluation_stack := " + str(self.evaluation_stack) 
         
         # first we create the key if it does not exists
@@ -282,7 +280,8 @@ class Storegraph:
             self.update(key)
 
         # if the stack is not empty, then we need to add an edge from the top of the stack to the current key 
-        if len(self.evaluation_stack) <> 0:
+        # but only if the value is not an instance of storearray
+        if len(self.evaluation_stack) <> 0 and not isinstance(self.values[key], StoreArray):
             self.G.add_edge(key, self.evaluation_stack[len(self.evaluation_stack)-1])
 
         # and finally return the value
@@ -385,6 +384,7 @@ class Storegraph:
         formulas = dict()
         values = dict()
         for i in self.G.nodes():
+            #print "node: " + str(i)
             if self.formulas[i] <> None:
                 formulas[i] = self.formulas[i]
             else:
@@ -404,8 +404,8 @@ class Storegraph:
 
         # we update all nodes with a formula
         for i in nx.topological_sort(self.G):
-            if self.formulas[i] <> None:
-                self.update(i)
+            #if self.formulas[i] <> None:
+            self.update(i)
 
 # this class represent a set of key as an array
 class StoreArray:
