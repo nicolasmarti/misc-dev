@@ -271,7 +271,7 @@ class Storegraph:
                 print "key == col: " + str(e) 
                 return None
 
-        print "StoreGraph.__getitem__(" + str(key) + ")__"
+        #print "StoreGraph.__getitem__(" + str(key) + ")__"
         #print "evaluation_stack := " + str(self.evaluation_stack) 
 
         # if we do not have the key, then we create a phantom store
@@ -279,12 +279,9 @@ class Storegraph:
             try:
                 return eval(key)
             except:      
-                if isinstance(key, str):
-                    phantom = PhantomStore(name = key, store = self)
-                    return phantom
-                else:
-                    return KeyError
-
+                phantom = PhantomStore(name = key, store = self)
+                return phantom
+                
         # if the key is dirty, we need to update it
         if self.state[key] == 0:
             #print "__getitem__ update"
@@ -424,7 +421,7 @@ class Storegraph:
 class PhantomStore:
     def __init__(self, name = None, store = None):
         # set the name
-        print "PhantomStore(" + name + ", " + str(store) + ")"
+        #print "PhantomStore(" + str(name) + ", " + str(store) + ")"
         if name == None or store == None:
             raise Exception
 
@@ -432,17 +429,28 @@ class PhantomStore:
         self.store = store
         
     def __setitem__(self, key, item):
-        print "PhantomStore.__setitem__(" + str(key) + ", " + str(item) + ")"
+        #print "PhantomStore.__setitem__(" + str(key) + ", " + str(item) + ")"
         self.store[(self.name, key)] = item
         return 
     
     def __getitem__(self, key):
-        print "PhantomStore.__getitem__(" + str(key) + ")"
+        #print "PhantomStore.__getitem__(" + str(key) + ")"
         return self.store[(self.name, key)]
 
     def __contains__(self, item):
         return item in self.store
     
+    def keys(self):
+        l = []
+        for i in self.store.G.nodes():
+            l2 = []
+            while i <> self.name and isinstance(i, tuple) and len(i) == 2:
+                l2.insert(0, i[1])
+                i = i[0]
+            if i == self.name:
+                l.append(l2)                
+        return l
+
 if __name__ == '__main__':
   from math import sin, pi
   
