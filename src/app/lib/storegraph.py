@@ -238,6 +238,10 @@ class Storegraph:
 
         return None
 
+    # look for a key
+    def __contains__(self, item):
+        return item in self.G.nodes()
+
     # getting a value
     def __getitem__(self, key):
 
@@ -256,7 +260,7 @@ class Storegraph:
                 mkey = self.evaluation_stack[len(self.evaluation_stack) - 1]                
                 return key2cell(mkey)[0]
             except Exception as e:
-                print e
+                print "key == row: " + str(e) 
                 return None
 
         if key == "col":
@@ -264,15 +268,22 @@ class Storegraph:
                 mkey = self.evaluation_stack[len(self.evaluation_stack) - 1]                
                 return key2cell(mkey)[1]
             except Exception as e:
-                print e
+                print "key == col: " + str(e) 
                 return None
 
-        #print "__getitem__(" + str(key) + ")__"
+        print "StoreGraph.__getitem__(" + str(key) + ")__"
         #print "evaluation_stack := " + str(self.evaluation_stack) 
 
-        # if we do not have the key, then we leave
+        # if we do not have the key, then we create a phantom store
         if key not in self.state:
-            raise KeyError
+            try:
+                return eval(key)
+            except:      
+                if isinstance(key, str):
+                    phantom = PhantomStore(name = key, store = self)
+                    return phantom
+                else:
+                    return KeyError
 
         # if the key is dirty, we need to update it
         if self.state[key] == 0:
@@ -280,8 +291,8 @@ class Storegraph:
             self.update(key)
 
         # if the stack is not empty, then we need to add an edge from the top of the stack to the current key 
-        # but only if the value is not an instance of storearray
-        if len(self.evaluation_stack) <> 0 and not isinstance(self.values[key], StoreArray):
+        # but only if the value is not an instance of phantomstore
+        if len(self.evaluation_stack) <> 0 and not isinstance(self.values[key], PhantomStore):
             self.G.add_edge(key, self.evaluation_stack[len(self.evaluation_stack)-1])
 
         # and finally return the value
@@ -353,7 +364,8 @@ class Storegraph:
 
     # eval
     def store_eval(self, cmd):
-        return eval(cmd, globals(), self)
+        value = eval(cmd, globals(), self) 
+        return value
 
     # add a calllback
     def add_callback(self, f):
@@ -407,70 +419,29 @@ class Storegraph:
             #if self.formulas[i] <> None:
             self.update(i)
 
-# this class represent a set of key as an array
-class StoreArray:
-    # constructor
-    def __init__(self, _globals = None, _locals = None, formula = None, name = None):
-
+# this class represent a phantom store
+# created dynamically by the store in order to give shape to data
+class PhantomStore:
+    def __init__(self, name = None, store = None):
         # set the name
-        if name == None:
+        print "PhantomStore(" + name + ", " + str(store) + ")"
+        if name == None or store == None:
             raise Exception
 
         self.name = name
-
-        # defining a global
-        if _globals == None:
-            self._globals = globals()
-        else:
-            self._globals = _globals
-
-        # and a local global
-        if _locals == None:
-            self._locals = Storegraph(_globals = self._globals())
-        else:
-            self._locals = _locals
-
-        # setup the callback
-        self._locals.add_callback(self.callback)
-
-        # we set the formula
-        self.formula = formula
-
-        # we set the size
-        self.size = 0
-
-    def __len__(self):
-        return self.size
-
-    def callback(self, msg, param):
-        print "StoreArray.callback" + str((msg, param))
-        return
-
+        self.store = store
+        
     def __setitem__(self, key, item):
-        if not (isinstance(key, int)) or key >= self.size:
-            raise KeyError
-
-        self._locals[(self.name, key)] = item
-
+        print "PhantomStore.__setitem__(" + str(key) + ", " + str(item) + ")"
+        self.store[(self.name, key)] = item
         return 
-
-    def __getitem__(self, key):
-        if not (isinstance(key, int)) or key >= self.size:
-            raise KeyError
-        
-        return self._locals[(self.name, key)]
     
-    def append(self, value):
-        self._locals[(self.name, self.size)] = value
-        self.size += 1
-        
-    def pop(self):
-        self.size -= 1
-        value = self._locals[(self.name, self.size)]
-        self._locals.__delitem__((self.name, self.size))
-        return value
-        
+    def __getitem__(self, key):
+        print "PhantomStore.__getitem__(" + str(key) + ")"
+        return self.store[(self.name, key)]
 
+    def __contains__(self, item):
+        return item in self.store
     
 if __name__ == '__main__':
   from math import sin, pi
