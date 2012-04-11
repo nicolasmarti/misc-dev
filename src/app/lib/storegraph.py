@@ -180,7 +180,7 @@ class Storegraph:
             raise KeyError
 
 
-        #print "__setitem__(" + str(key) + ", " + str(value) + ")"
+        #print "StoreGraph.__setitem__(" + str(key) + ", " + str(value) + ")"
         #print "evaluation_stack := " + str(self.evaluation_stack) 
         
         # first we create the key if it does not exists
@@ -201,9 +201,23 @@ class Storegraph:
             else:
                 self.state[key] = 0 
 
+                # and we set all possible successor to dirty state
+                for i in nx.topological_sort(self.G, [key]):
+                    if i <> key:
+                        #print str(key) + " -> " + str(i)
+                        self.state[i] = 0
+
+
         else:
             self.formulas[key] = None
             self.values[key] = value
+            
+            # and we set all possible successor to dirty state
+            for i in nx.topological_sort(self.G, [key]):
+                if i <> key:
+                    #print str(key) + " -> " + str(i)
+                    self.state[i] = 0
+
 
             # we call the callbacks
             for i in self.callbacks:
@@ -233,6 +247,8 @@ class Storegraph:
         # forall our successor that are eager and dirty we update
         for i in nx.topological_sort(self.G, [key]):
             if i <> key:
+                #print "StoreGraph.setitem : need to update " + str(i) + " " + str((self.mode[i], self.state[i]))
+                
                 if self.mode[i] == 1 and self.state[i] == 0:
                     self.update(i)
 
@@ -271,7 +287,6 @@ class Storegraph:
                 print "key == col: " + str(e) 
                 return None
 
-        #print "StoreGraph.__getitem__(" + str(key) + ")__"
         #print "evaluation_stack := " + str(self.evaluation_stack) 
 
         # if we do not have the key, then we create a phantom store
@@ -281,6 +296,8 @@ class Storegraph:
             except:      
                 phantom = PhantomStore(name = key, store = self)
                 return phantom
+
+        #print "StoreGraph.__getitem__(" + str(key) + ")__"
                 
         # if the key is dirty, we need to update it
         if self.state[key] == 0:
