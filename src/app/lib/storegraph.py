@@ -316,6 +316,9 @@ class Storegraph:
     def remove_key(self, key):
         self.__delitem__(key)
 
+    def __iter__(self):
+        return None
+
     #delete an element
     def __delitem__(self, key):
 
@@ -457,6 +460,9 @@ class PhantomStore:
     def __contains__(self, item):
         return item in self.store
     
+    def __iter__(self):
+        return None
+
     def keys(self):
         l = []
         for i in self.store.G.nodes():
@@ -467,6 +473,9 @@ class PhantomStore:
             if i == self.name:
                 l.append(l2)                
         return l
+
+    def store_import(self, name):
+        self[name] = "= __import__(\"" + name + "\")"
 
 if __name__ == '__main__':
   from math import sin, pi
