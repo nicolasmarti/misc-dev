@@ -130,7 +130,6 @@ class BackTest(Strat):
         self.bars = load(open(filename, "rb"))
         self.bars.reverse()
 
-
     # the order function
     def order(self, size, price, side):
         return None
@@ -143,11 +142,25 @@ class BackTest(Strat):
     def cancel(self):
         return None
 
+    # run the backtest
+    def run(self):
+        for i in self.bars:
+            print i
+
+            # add the bar
+            self.store["bars"][self.store["nb bars"]] = i
+
+            # increment the number of bar
+            self.store["nb bars"] += 1
+
+            # call the step
+            self.step()
 
 if __name__ == "__main__":
     
     bt = BackTest("8604.TSE")
+
+    bt.run()
     
-
-
+    print bt.store["pnl"]
     
