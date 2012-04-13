@@ -198,106 +198,31 @@ class BackTest(Strat):
 
 
 
+def is_increasing(l):
 
-# a first strat: look for order in several EMA
-class Strat1(BackTest):
+    for i in range(0, len(l)):
+        if l.count(l[i]) > 1:
+            return False
+        
+    for i in range(0, len(l)-1):
+        if l[i] >= l[i+1]:
+            return False
     
-    def __init__(self):
-        BackTest.__init__(self)
+    return True
 
-        self.store["nbema"] = 6
+def is_decreasing(l):
+
+    for i in range(0, len(l)):
+        if l.count(l[i]) > 1:
+            return False
         
-        for i in range(0, self.store["nbema"]):            
-            if i == 0:
-                self.store["ema"][i]["period"] = 5
-            else:
-                self.store["ema"][i]["period"] = self.store["ema"][i-1]["period"]*2
-        
-        print self.store["ema"]
-
-    def entry(self):
-        lema = []
-        for i in range(0, self.store["nbema"]):
-            lema.append(self.store["ema"][i]["value"][self.store["nb bars"] - 1])
-
-        if self.is_lt_sorted(lema):            
-            #print "lt_sorted: " + str(lema)
-            return (-100, None)
-
-        if self.is_gt_sorted(lema):            
-            #print "gt_sorted: " + str(lema)
-            return (100, None)
-
-        return None
-
-    # return a price
-    def exit(self):
-        lema = []
-        for i in range(0, self.store["nbema"]):
-            lema.append(self.store["ema"][i]["value"][self.store["nb bars"] - 1])
-
-        if not (self.is_lt_sorted(lema) or self.is_gt_sorted(lema)):
-            #print "unsorted: " + str(lema) 
-            return True
-
-        #print "sorted: " + str(lema) 
-
-        return None
-
-
-    # 
-    def is_lt_sorted(self, l):
-
-        if self.store["nb bars"] < self.store["ema"][self.store["nbema"] - 1]["period"]:
+    for i in range(0, len(l)-1):
+        if l[i] <= l[i+1]:
             return False
 
-        for i in range(0, len(l)-1):
-            #print lema.count(i)
-            if l.count(l[i]) > 1:
-                return False
-        
-        res = True
-
-        for i in range(1, len(l)-1):
-            res = res and l[i-1] < l[i]
-
-        return res
-
-    def is_gt_sorted(self, l):
-
-        if self.store["nb bars"] < self.store["ema"][self.store["nbema"] - 1]["period"]:
-            return False
-
-        for i in range(0, len(l)-1):
-            #print lema.count(i)
-            if l.count(l[i]) > 1:
-                return False
-        
-        res = True
-
-        for i in range(1, len(l)-1):
-            res = res and l[i-1] > l[i]
-
-        return res
+    return True
 
 
-    # the update function
-    def update(self):
-        for i in range(0, self.store["nbema"]):
-            index = self.store["nb bars"] - 1
-            price = self.store["bars"][index]["ajust. close"]
-            period = self.store["ema"][i]["period"]            
-            try:
-                lastema = self.store["ema"][i]["value"][index - 1]
-                alpha = 2.0/(float(period)+1.0)
-                newema = lastema * (1-alpha) + price * alpha
-                self.store["ema"][i]["value"][index] = newema
-            except Exception as e:
-                #print e
-                self.store["ema"][i]["value"][index] = price
-       
-
-        return None
 
 # a second strat: look for an index in the ema such that the first segment is increasing and the other decreasing
 class Strat2(BackTest):
@@ -305,13 +230,13 @@ class Strat2(BackTest):
     def __init__(self):
         BackTest.__init__(self)
 
-        self.store["nbema"] = 6
+        self.store["nbema"] = 10
         
         for i in range(0, self.store["nbema"]):            
             if i == 0:
                 self.store["ema"][i]["period"] = 5
             else:
-                self.store["ema"][i]["period"] = self.store["ema"][i-1]["period"]*2
+                self.store["ema"][i]["period"] = (i + 1) * 5 #self.store["ema"][i-1]["period"]*2
         
         print self.store["ema"]
         self.store["index"] = []
@@ -330,102 +255,58 @@ class Strat2(BackTest):
         # look for an index of /\ shape
         for i in range(0, self.store["nbema"]):
 
-            if not self.is_lt_sorted(lema[0:i]):            
-                continue
-                
-            if not self.is_gt_sorted(lema[i:len(lema)-1]):            
-                continue
-
-            if indexA == None:
-                indexA = i
-            else:
-                indexA = max(indexA, i)
+            if is_increasing(lema[0:i]) and is_decreasing(lema[i:len(lema)-1]):            
+                if indexA == None:
+                    indexA = i
+                else:
+                    indexA = max(indexA, i)
+                    
 
         indexV = None
         # look for an index of \/ shape
         for i in range(0, self.store["nbema"]):
 
-            if not self.is_gt_sorted(lema[0:i]):            
-                continue
-                
-            if not self.is_lt_sorted(lema[i:len(lema)-1]):            
-                continue
+            if is_decreasing(lema[0:i]) and is_increasing(lema[i:len(lema)-1]):            
+                if indexV == None:
+                    indexV = i
+                else:
+                    indexV = max(indexV, i)
 
-            if indexV == None:
-                indexV = i
-            else:
-                indexV = max(indexV, i)
+        if indexA == self.store["nbema"]-1 and indexV == 1:
+            indexV = None
 
-        #if index <> None:
-        #    print "increasing : " + str(lema[0:index])
-        #    print "decreasing : " + str(lema[index:len(lema)-1])
+        if indexV == self.store["nbema"]-1 and indexA == 1:
+            indexA = None
 
         if indexA <> None:
-            self.store["index"].append(indexA)
+            print "AShape (" + str(indexA) + "): " + str((lema[0:indexA], lema[indexA:len(lema)-1]))
 
         if indexV <> None:
-            self.store["index"].append(-indexV)
+            print "VShape (" + str(indexV) + ": " + str((lema[0:indexV], lema[indexV:len(lema)-1]))
+
+     
+        #if indexA <> None:
+        #    self.store["index"].append(indexA)
+
+        #if indexV <> None:
+        #    self.store["index"].append(-indexV)
 
         if indexA == None and indexV == None:
             print "index == None in " + str(lema)
+
+
+        print ""
+    
 
         return None
 
     # return a price
     def exit(self):
 
-        if self.store["nb bars"] < self.store["ema"][self.store["nbema"] - 1]["period"]:
-            return None
-
-        lema = []
-        for i in range(0, self.store["nbema"]):
-            lema.append(self.store["ema"][i]["value"][self.store["nb bars"] - 1])
-
-        if not (self.is_lt_sorted(lema) or self.is_gt_sorted(lema)):
-            #print "unsorted: " + str(lema) 
-            return True
-
-        #print "sorted: " + str(lema) 
-
         return None
 
 
     # 
-    def is_lt_sorted(self, l):
-
-        if self.store["nb bars"] < self.store["ema"][self.store["nbema"] - 1]["period"]:
-            return False
-
-        for i in range(0, len(l)-1):
-            #print lema.count(i)
-            if l.count(l[i]) > 1:
-                return False
-        
-        res = True
-
-        for i in range(1, len(l)-1):
-            res = res and l[i-1] < l[i]
-
-        return res
-
-    def is_gt_sorted(self, l):
-
-        if self.store["nb bars"] < self.store["ema"][self.store["nbema"] - 1]["period"]:
-            return False
-
-        for i in range(0, len(l)-1):
-            #print lema.count(i)
-            if l.count(l[i]) > 1:
-                return False
-        
-        res = True
-
-        for i in range(1, len(l)-1):
-            res = res and l[i-1] > l[i]
-
-        return res
-
-
     # the update function
     def update(self):
         for i in range(0, self.store["nbema"]):
