@@ -463,9 +463,25 @@ class PhantomStore:
     def __iter__(self):
         return None
 
+    def __str__(self):
+        keys = self.keys()
+
+        res = ""
+
+        for i in keys:
+            value = self
+            for j in i:
+                value = value[j]
+
+            res += str(i) + " := " + str(value) + "\n"
+
+        return res
+
     def keys(self):
         l = []
-        for i in self.store.G.nodes():
+        nodes = self.store.G.nodes()
+        nodes.sort()
+        for i in nodes:
             l2 = []
             while i <> self.name and isinstance(i, tuple) and len(i) == 2:
                 l2.insert(0, i[1])
