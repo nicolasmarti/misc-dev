@@ -236,7 +236,7 @@ class Strat2(BackTest):
             if i == 0:
                 self.store["ema"][i]["period"] = 5
             else:
-                self.store["ema"][i]["period"] = (i + 1) * 5 #self.store["ema"][i-1]["period"]*2
+                self.store["ema"][i]["period"] = self.store["ema"][i-1]["period"] * 1.5
         
         print self.store["ema"]
         self.store["index"] = []
@@ -255,7 +255,7 @@ class Strat2(BackTest):
         # look for an index of /\ shape
         for i in range(0, self.store["nbema"]):
 
-            if is_increasing(lema[0:i]) and is_decreasing(lema[i:len(lema)-1]):            
+            if is_increasing(lema[0:i]) and is_decreasing(lema[i:len(lema)]):            
                 if indexA == None:
                     indexA = i
                 else:
@@ -266,7 +266,7 @@ class Strat2(BackTest):
         # look for an index of \/ shape
         for i in range(0, self.store["nbema"]):
 
-            if is_decreasing(lema[0:i]) and is_increasing(lema[i:len(lema)-1]):            
+            if is_decreasing(lema[0:i]) and is_increasing(lema[i:len(lema)]):            
                 if indexV == None:
                     indexV = i
                 else:
@@ -278,13 +278,16 @@ class Strat2(BackTest):
         if indexV == self.store["nbema"]-1 and indexA == 1:
             indexA = None
 
-        if indexA <> None:
-            print "AShape (" + str(indexA) + "): " + str((lema[0:indexA], lema[indexA:len(lema)-1]))
+        if indexA <> None and indexA <> self.store["nbema"]-1:
+            print "AShape (" + str(indexA) + "): " + str((lema[0:indexA], lema[indexA:len(lema)]))
+
+        if indexA <> None and indexA == self.store["nbema"]-1:
+            print "increasing : " + str(lema)
 
         if indexV <> None:
-            print "VShape (" + str(indexV) + ": " + str((lema[0:indexV], lema[indexV:len(lema)-1]))
+            print "VShape (" + str(indexV) + ": " + str((lema[0:indexV], lema[indexV:len(lema)]))
 
-     
+
         #if indexA <> None:
         #    self.store["index"].append(indexA)
 
