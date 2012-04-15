@@ -236,7 +236,7 @@ class Strat2(BackTest):
             if i == 0:
                 self.store["ema"][i]["period"] = 5
             else:
-                self.store["ema"][i]["period"] = self.store["ema"][i-1]["period"] * 1.5
+                self.store["ema"][i]["period"] = int(self.store["ema"][i-1]["period"] * 1.5)
         
         print self.store["ema"]
         self.store["index"] = []
@@ -284,22 +284,15 @@ class Strat2(BackTest):
         if indexA <> None and indexA == self.store["nbema"]-1:
             print "increasing : " + str(lema)
 
-        if indexV <> None:
+        if indexV <> None and indexV == 0:
+            print "decreasing : " + str(lema)
+
+        if indexV <> None and indexA <> 0:
             print "VShape (" + str(indexV) + ": " + str((lema[0:indexV], lema[indexV:len(lema)]))
 
-
-        #if indexA <> None:
-        #    self.store["index"].append(indexA)
-
-        #if indexV <> None:
-        #    self.store["index"].append(-indexV)
-
         if indexA == None and indexV == None:
-            print "index == None in " + str(lema)
+            print "index == None in " #+ str(lema)
 
-
-        print ""
-    
 
         return None
 
