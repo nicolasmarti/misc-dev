@@ -254,10 +254,6 @@ class Storegraph:
 
         return None
 
-    # look for a key
-    def __contains__(self, item):
-        return item in self.G.nodes()
-
     # getting a value
     def __getitem__(self, key):
 
@@ -316,9 +312,6 @@ class Storegraph:
     def remove_key(self, key):
         self.__delitem__(key)
 
-    def __iter__(self):
-        return None
-
     #delete an element
     def __delitem__(self, key):
 
@@ -374,6 +367,13 @@ class Storegraph:
     # returns keys
     def keys(self):
         return self.G.nodes()
+
+    # look for a key
+    def __contains__(self, item):
+        return item in self.G.nodes()
+
+    def __iter__(self):
+        return None
 
     # exec
     def store_exec(self, cmd):
@@ -461,7 +461,9 @@ class PhantomStore:
         return item in self.store
     
     def __iter__(self):
-        return None
+        self.count = 0
+        self.mykeys = self.keys()
+        return self
 
     def __str__(self):
         keys = self.keys()
@@ -477,17 +479,22 @@ class PhantomStore:
 
         return res
 
+    def next(self):
+        if self.count >= len(self.mykeys):
+            raise StopIteration
+        else:
+            self.count += 1
+            return self[self.count - 1]
+
     def keys(self):
         l = []
         nodes = self.store.G.nodes()
         nodes.sort()
         for i in nodes:
-            l2 = []
-            while i <> self.name and isinstance(i, tuple) and len(i) == 2:
-                l2.insert(0, i[1])
-                i = i[0]
-            if i == self.name:
-                l.append(l2)                
+            while i <> self.name and isinstance(i, tuple) and len(i) == 2:                
+                if i[0] == self.name:
+                    l.append(i[1])
+                    i = i[0]
         return l
 
     def store_import(self, name):
