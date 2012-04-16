@@ -242,13 +242,13 @@ class Strat2(BackTest):
     def __init__(self):
         BackTest.__init__(self)
 
-        self.store["nbema"] = 10
+        self.store["nbema"] = 6
         
         for i in range(0, self.store["nbema"]):            
             if i == 0:
                 self.store["ema"][i]["period"] = 5
             else:
-                self.store["ema"][i]["period"] = self.store["ema"][i-1]["period"] * 1.5
+                self.store["ema"][i]["period"] = self.store["ema"][i-1]["period"] * 2
         
         print self.store["ema"]
         self.store["index"] = []
