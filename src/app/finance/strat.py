@@ -5,6 +5,9 @@ from datetime import *
 
 from pickle import *
 
+import yahoojap
+import sys
+
 class Strat():
 
     def __init__(self):
@@ -196,9 +199,15 @@ class BackTest(Strat):
         self.bars = load(open(filename, "rb"))
         self.bars.reverse()
 
+    def getyahoojpan(self, ticker, startdate, enddate = date.today()):
+        self.bars = yahoojap.get_historical(ticker, startdate, enddate, filename = None)
+        self.bars.reverse()
 
 
 def is_increasing(l):
+
+    if len(l) <= 1:
+        return False
 
     for i in range(0, len(l)):
         if l.count(l[i]) > 1:
@@ -211,6 +220,9 @@ def is_increasing(l):
     return True
 
 def is_decreasing(l):
+
+    if len(l) <= 1:
+        return False
 
     for i in range(0, len(l)):
         if l.count(l[i]) > 1:
@@ -250,10 +262,17 @@ class Strat2(BackTest):
         for i in range(0, self.store["nbema"]):
             lema.append(self.store["ema"][i]["value"][self.store["nb bars"] - 1])
 
+        increasing = False
+        if is_increasing(lema):
+            increasing = True
+
+        decreasing = False
+        if is_decreasing(lema):
+            decreasing = True
 
         indexA = None
         # look for an index of /\ shape
-        for i in range(0, self.store["nbema"]):
+        for i in range(0, self.store["nbema"]+1):
 
             if is_increasing(lema[0:i]) and is_decreasing(lema[i:len(lema)]):            
                 if indexA == None:
@@ -264,7 +283,7 @@ class Strat2(BackTest):
 
         indexV = None
         # look for an index of \/ shape
-        for i in range(0, self.store["nbema"]):
+        for i in range(0, self.store["nbema"]+1):
 
             if is_decreasing(lema[0:i]) and is_increasing(lema[i:len(lema)]):            
                 if indexV == None:
@@ -272,32 +291,94 @@ class Strat2(BackTest):
                 else:
                     indexV = max(indexV, i)
 
-        if indexA == self.store["nbema"]-1 and indexV == 1:
-            indexV = None
+        #if indexA <> None:
+        #    print "AShape (" + str(indexA) + "): " + str((lema[0:indexA], lema[indexA:len(lema)]))
 
-        if indexV == self.store["nbema"]-1 and indexA == 1:
-            indexA = None
+        #if indexV <> None:
+        #    print "VShape (" + str(indexV) + ": " + str((lema[0:indexV], lema[indexV:len(lema)]))
 
-        if indexA <> None and indexA <> self.store["nbema"]-1:
-            print "AShape (" + str(indexA) + "): " + str((lema[0:indexA], lema[indexA:len(lema)]))
+        #if increasing:
+        #    print "increasing: " + str(lema)
 
-        if indexA <> None and indexA == self.store["nbema"]-1:
-            print "increasing : " + str(lema)
+        #if decreasing:
+        #    print "decreasing: " + str(lema)
 
-        if indexV <> None and indexV == 0:
-            print "decreasing : " + str(lema)
+        #if indexA == None and indexV == None and decreasing and increasing :
+        #    print "index == None in " + str(lema)
 
-        if indexV <> None and indexA <> 0:
-            print "VShape (" + str(indexV) + ": " + str((lema[0:indexV], lema[indexV:len(lema)]))
+        #print ""
 
-        if indexA == None and indexV == None:
-            print "index == None in " #+ str(lema)
+        # we short sell if increasing or Vshape with i <= 2
+        if increasing or (indexV <> None and indexV <= 2):
+            return (-100, None)
+
+        # we go long if decreasing or Ashape with i <= 2
+        if decreasing or (indexA <> None and indexA <= 2):
+            return (-100, None)
 
 
         return None
 
     # return a price
     def exit(self):
+
+        # we close if no trend
+        if self.store["nb bars"] < self.store["ema"][self.store["nbema"] - 1]["period"]:
+            return None
+
+        lema = []
+        for i in range(0, self.store["nbema"]):
+            lema.append(self.store["ema"][i]["value"][self.store["nb bars"] - 1])
+
+        increasing = False
+        if is_increasing(lema):
+            increasing = True
+
+        decreasing = False
+        if is_decreasing(lema):
+            decreasing = True
+
+        indexA = None
+        # look for an index of /\ shape
+        for i in range(0, self.store["nbema"]+1):
+
+            if is_increasing(lema[0:i]) and is_decreasing(lema[i:len(lema)]):            
+                if indexA == None:
+                    indexA = i
+                else:
+                    indexA = max(indexA, i)
+                    
+
+        indexV = None
+        # look for an index of \/ shape
+        for i in range(0, self.store["nbema"]+1):
+
+            if is_decreasing(lema[0:i]) and is_increasing(lema[i:len(lema)]):            
+                if indexV == None:
+                    indexV = i
+                else:
+                    indexV = max(indexV, i)
+
+        #if indexA <> None:
+        #    print "AShape (" + str(indexA) + "): " + str((lema[0:indexA], lema[indexA:len(lema)]))
+
+        #if indexV <> None:
+        #    print "VShape (" + str(indexV) + ": " + str((lema[0:indexV], lema[indexV:len(lema)]))
+
+        #if increasing:
+        #    print "increasing: " + str(lema)
+
+        #if decreasing:
+        #    print "decreasing: " + str(lema)
+
+        #if indexA == None and indexV == None and decreasing and increasing :
+        #    print "index == None in " + str(lema)
+
+        #print ""
+
+        # we short sell if increasing or Vshape with i <= 2
+        if not (increasing or (indexV <> None and indexV <= 2)) and not (decreasing or (indexA <> None and indexA <= 2)):
+            return True
 
         return None
 
@@ -325,7 +406,18 @@ class Strat2(BackTest):
 if __name__ == "__main__":
     
     bt = Strat2()
-    bt.load("8604.TSE")
+
+    if (len(sys.argv) > 1):
+        ticker = sys.argv[1]
+    else:
+        ticker = "3407"
+
+    try:
+        open(ticker, "rb")
+    except:
+        yahoojap.get_historical(ticker, date(2008,1,1), filename = ticker)
+
+    bt.load(ticker)
 
     bt.run()
     

@@ -233,6 +233,13 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
 
         self.get_settings().set_property("gtk-error-bell", False)
 
+        # add the new print function
+        self.m_locals["mprint"] = self.myprint
+
+    # a special print for here
+    def myprint(self, s):
+        self.textbuffer2.set_text(str(s) + "\n")
+
     def clear_buffers(self):
         self.textbuffer2.set_text("")  
         self.entry.set_text("")  
@@ -311,7 +318,7 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         try:
             #exec m_str in globals(), self.m_locals
             self.m_locals.store_exec(m_str)
-            self.textbuffer2.set_text("")        
+            #self.textbuffer2.set_text("")        
             self.m_start = self.textbuffer.get_end_iter()
             self.textbuffer.set_text("")
             self.entry.set_text("")
