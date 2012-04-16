@@ -74,7 +74,11 @@ class Strat():
             upnl += order[0]
 
         upnl2 = upnl * self.store["bars"][self.store["nb bars"] - 1]["ajust. close"]
-        return (pnl, upnl, upnl2, pnl + upnl2)
+
+        res = (pnl, upnl, upnl2, pnl + upnl2)
+        self.store["bars"][self.store["nb bars"] - 1]["pnl"] = res
+
+        return res
 
 
     #######################################################
@@ -258,17 +262,66 @@ class Strat2(BackTest):
         if self.store["nb bars"] < self.store["ema"][self.store["nbema"] - 1]["period"]:
             return None
 
+        index = self.store["nb bars"] - 1
+
+        # we short sell if increasing or Vshape with i <= 2
+        if self.store["data"][index]["increasing"]:# or (indexV <> None and indexV <= 2):
+            return (-100, None)
+
+        # we go long if decreasing or Ashape with i <= 2
+        if self.store["data"][index]["decreasing"]:# or (indexA <> None and indexA <= 2):
+            return (-100, None)
+
+
+        return None
+
+    # return a price
+    def exit(self):
+
+        if self.store["nb bars"] < self.store["ema"][self.store["nbema"] - 1]["period"]:
+            return None
+
+        index = self.store["nb bars"] - 1
+
+        # we short sell if increasing or Vshape with i <= 2
+        if not (self.store["data"][index]["increasing"]) and not (self.store["data"][index]["decreasing"]):
+            return True
+
+        return None
+
+
+    # 
+    # the update function
+    def update(self):
+        index = self.store["nb bars"] - 1
+        price = self.store["bars"][index]["ajust. close"]
+
+        for i in range(0, self.store["nbema"]):
+            period = self.store["ema"][i]["period"]            
+            try:
+                lastema = self.store["ema"][i]["value"][index - 1]
+                alpha = 2.0/(float(period)+1.0)
+                newema = lastema * (1-alpha) + price * alpha
+                self.store["ema"][i]["value"][index] = newema
+            except Exception as e:
+                #print e
+                self.store["ema"][i]["value"][index] = price
+
+
+        self.store["data"][index]["lema"] = []
+
+        if self.store["nb bars"] < self.store["ema"][self.store["nbema"] - 1]["period"]:            
+            return None
+
         lema = []
         for i in range(0, self.store["nbema"]):
             lema.append(self.store["ema"][i]["value"][self.store["nb bars"] - 1])
 
-        increasing = False
-        if is_increasing(lema):
-            increasing = True
+        self.store["data"][index]["lema"] = lema
 
-        decreasing = False
-        if is_decreasing(lema):
-            decreasing = True
+        self.store["data"][index]["increasing"] = is_increasing(lema)
+
+        self.store["data"][index]["decreasing"] = is_decreasing(lema)
 
         indexA = None
         # look for an index of /\ shape
@@ -280,6 +333,8 @@ class Strat2(BackTest):
                 else:
                     indexA = max(indexA, i)
                     
+        self.store["data"][index]["indexA"] = indexA
+
 
         indexV = None
         # look for an index of \/ shape
@@ -290,6 +345,8 @@ class Strat2(BackTest):
                     indexV = i
                 else:
                     indexV = max(indexV, i)
+
+        self.store["data"][index]["indexV"] = indexV
 
         if False:
             if indexA <> None:
@@ -309,79 +366,7 @@ class Strat2(BackTest):
 
             print ""
 
-        # we short sell if increasing or Vshape with i <= 2
-        if increasing:# or (indexV <> None and indexV <= 2):
-            return (-100, None)
 
-        # we go long if decreasing or Ashape with i <= 2
-        if decreasing:# or (indexA <> None and indexA <= 2):
-            return (-100, None)
-
-
-        return None
-
-    # return a price
-    def exit(self):
-
-        # we close if no trend
-        if self.store["nb bars"] < self.store["ema"][self.store["nbema"] - 1]["period"]:
-            return None
-
-        lema = []
-        for i in range(0, self.store["nbema"]):
-            lema.append(self.store["ema"][i]["value"][self.store["nb bars"] - 1])
-
-        increasing = False
-        if is_increasing(lema):
-            increasing = True
-
-        decreasing = False
-        if is_decreasing(lema):
-            decreasing = True
-
-        indexA = None
-        # look for an index of /\ shape
-        for i in range(0, self.store["nbema"]+1):
-
-            if is_increasing(lema[0:i]) and is_decreasing(lema[i:len(lema)]):            
-                if indexA == None:
-                    indexA = i
-                else:
-                    indexA = max(indexA, i)
-                    
-
-        indexV = None
-        # look for an index of \/ shape
-        for i in range(0, self.store["nbema"]+1):
-
-            if is_decreasing(lema[0:i]) and is_increasing(lema[i:len(lema)]):            
-                if indexV == None:
-                    indexV = i
-                else:
-                    indexV = max(indexV, i)
-
-        # we short sell if increasing or Vshape with i <= 2
-        if not (increasing or (indexV <> None and indexV <= 2)) and not (decreasing or (indexA <> None and indexA <= 2)):
-            return True
-
-        return None
-
-
-    # 
-    # the update function
-    def update(self):
-        for i in range(0, self.store["nbema"]):
-            index = self.store["nb bars"] - 1
-            price = self.store["bars"][index]["ajust. close"]
-            period = self.store["ema"][i]["period"]            
-            try:
-                lastema = self.store["ema"][i]["value"][index - 1]
-                alpha = 2.0/(float(period)+1.0)
-                newema = lastema * (1-alpha) + price * alpha
-                self.store["ema"][i]["value"][index] = newema
-            except Exception as e:
-                #print e
-                self.store["ema"][i]["value"][index] = price
        
 
         return None
@@ -389,24 +374,23 @@ class Strat2(BackTest):
 
 if __name__ == "__main__":
     
-    bt = Strat2()
 
     if (len(sys.argv) > 1):
-        ticker = sys.argv[1]
+        tickers = sys.argv[1:]
     else:
-        ticker = "8604"
+        tickers = []
 
-    try:
-        open(ticker, "rb")
-    except:
-        yahoojap.get_historical(ticker, date(2008,1,1), filename = ticker)
+    for ticker in tickers:
 
-    bt.load(ticker)
+        bt = Strat2()
+        
+        try:
+            open(ticker + ".quotes", "rb")
+        except:
+            yahoojap.get_historical(ticker, date(2008,1,1), filename = ticker + ".quotes")
 
-    bt.run()
+        bt.load(ticker + ".quotes")
+
+        bt.run()
     
-    print bt.pnl_upnl()
-    print bt.store["index"]
-    l = filter(lambda x: x <> None, bt.store["index"])
-    print l
-    
+        bt.store.save(open(ticker + ".log", "wb"))
