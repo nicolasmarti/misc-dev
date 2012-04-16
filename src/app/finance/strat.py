@@ -291,29 +291,12 @@ class Strat2(BackTest):
                 else:
                     indexV = max(indexV, i)
 
-        #if indexA <> None:
-        #    print "AShape (" + str(indexA) + "): " + str((lema[0:indexA], lema[indexA:len(lema)]))
-
-        #if indexV <> None:
-        #    print "VShape (" + str(indexV) + ": " + str((lema[0:indexV], lema[indexV:len(lema)]))
-
-        #if increasing:
-        #    print "increasing: " + str(lema)
-
-        #if decreasing:
-        #    print "decreasing: " + str(lema)
-
-        #if indexA == None and indexV == None and decreasing and increasing :
-        #    print "index == None in " + str(lema)
-
-        #print ""
-
         # we short sell if increasing or Vshape with i <= 2
-        if increasing or (indexV <> None and indexV <= 2):
+        if increasing:# or (indexV <> None and indexV <= 2):
             return (-100, None)
 
         # we go long if decreasing or Ashape with i <= 2
-        if decreasing or (indexA <> None and indexA <= 2):
+        if decreasing:# or (indexA <> None and indexA <= 2):
             return (-100, None)
 
 
@@ -358,23 +341,6 @@ class Strat2(BackTest):
                     indexV = i
                 else:
                     indexV = max(indexV, i)
-
-        #if indexA <> None:
-        #    print "AShape (" + str(indexA) + "): " + str((lema[0:indexA], lema[indexA:len(lema)]))
-
-        #if indexV <> None:
-        #    print "VShape (" + str(indexV) + ": " + str((lema[0:indexV], lema[indexV:len(lema)]))
-
-        #if increasing:
-        #    print "increasing: " + str(lema)
-
-        #if decreasing:
-        #    print "decreasing: " + str(lema)
-
-        #if indexA == None and indexV == None and decreasing and increasing :
-        #    print "index == None in " + str(lema)
-
-        #print ""
 
         # we short sell if increasing or Vshape with i <= 2
         if not (increasing or (indexV <> None and indexV <= 2)) and not (decreasing or (indexA <> None and indexA <= 2)):
