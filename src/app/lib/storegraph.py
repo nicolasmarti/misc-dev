@@ -471,10 +471,7 @@ class PhantomStore:
         res = ""
 
         for i in keys:
-            value = self
-            for j in i:
-                value = value[j]
-
+            value = self[i]
             res += str(i) + " := " + str(value) + "\n"
 
         return res
@@ -494,7 +491,7 @@ class PhantomStore:
             while i <> self.name and isinstance(i, tuple) and len(i) == 2:                
                 if i[0] == self.name:
                     l.append(i[1])
-                    i = i[0]
+                i = i[0]
         return l
 
     def store_import(self, name):

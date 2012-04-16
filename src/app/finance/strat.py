@@ -68,17 +68,13 @@ class Strat():
         pnl = 0
         upnl = 0
         for i in self.store["order"].keys():
-            i = i[0]
             order = self.store["order"][i]
             pnl += -order[0] * order[1]
             upnl += order[0]
 
         upnl2 = upnl * self.store["bars"][self.store["nb bars"] - 1]["ajust. close"]
 
-        res = (pnl, upnl, upnl2, pnl + upnl2)
-        self.store["bars"][self.store["nb bars"] - 1]["pnl"] = res
-
-        return res
+        return (pnl, upnl, upnl2, pnl + upnl2)
 
 
     #######################################################
@@ -197,6 +193,8 @@ class BackTest(Strat):
 
             # call the step
             self.step()
+
+        self.store["final pnl"] = self.pnl_upnl()
 
     def load(self, filename):
         # open the bars file and reverse it
@@ -378,7 +376,9 @@ if __name__ == "__main__":
     if (len(sys.argv) > 1):
         tickers = sys.argv[1:]
     else:
-        tickers = []
+        # all tickers of nikkei
+        tickers = [2802, 2502, 2914, 2801, 2503, 2269, 2871, 2282, 2002, 2501, 2531, 3105, 3401, 3402, 3101]
+        tickers = map(lambda x: str(x), tickers)
 
     for ticker in tickers:
 
@@ -394,3 +394,5 @@ if __name__ == "__main__":
         bt.run()
     
         bt.store.save(open(ticker + ".log", "wb"))
+
+        print bt.store["final pnl"]
