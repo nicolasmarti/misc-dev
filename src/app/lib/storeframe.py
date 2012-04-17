@@ -46,7 +46,7 @@ class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         self.sw = gtk.ScrolledWindow()
         self.sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
 
-        self.liststore = gtk.ListStore(str, str, str, str)
+        self.liststore = gtk.TreeStore(str, str, str, str)
         self.treeview = gtk.TreeView(self.liststore)
 
         self.fields = ["key", "formula", "type", "value"]
@@ -161,44 +161,105 @@ class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
 
         if action == "update":
             key = param[0]
-            
-            try:
-                formula = self.store.formulas[key]
-            except:
-                formula = "no formula"
 
-            try:
-                keytype = type(self.store.values[key])
-            except:
-                keytype = "no type"
+            if isinstance(key, str):
+                try:
+                    formula = self.store.formulas[key]
+                except:
+                    formula = "no formula"
 
-            try:
-                value = self.store.values[key]
-                if isinstance(value, ModuleType):                    
-                    l = self.store.store_eval("dir(" + key + ")")
-                    value = str(l)
-                    #print l
-                else:
-                    value = str(value)
+                try:
+                    keytype = type(self.store.values[key])
+                except:
+                    keytype = "no type"
 
-            except Exception as e:
-                print e
-                value = "no value"
+                try:
+                    value = self.store.values[key]
+                    if isinstance(value, ModuleType):                    
+                        l = self.store.store_eval("dir(" + key + ")")
+                        value = str(l)
+                    else:
+                        value = str(value)
+
+                except Exception as e:
+                    print e
+                    value = "no value"
 
 
-            if key not in self.key2iter.keys():
-                self.key2iter[key] = self.liststore.append()
+                if key not in self.key2iter.keys():
+                    self.key2iter[key] = self.liststore.append(None)
 
-            self.liststore.set(self.key2iter[key], 0, str(key))
-            self.liststore.set(self.key2iter[key], 1, formula)
-            self.liststore.set(self.key2iter[key], 2, keytype)
-            self.liststore.set(self.key2iter[key], 3, value)
+                self.liststore.set(self.key2iter[key], 0, str(key))
+                self.liststore.set(self.key2iter[key], 1, formula)
+                self.liststore.set(self.key2iter[key], 2, keytype)
+                self.liststore.set(self.key2iter[key], 3, value)
+
+            if isinstance(key, tuple):
+                l = []
+                k = key
+                while isinstance(k, tuple):
+                    l.insert(0, k[1])
+                    k = k[0]
+
+                keyname = str(k)
+                miter = None
+
+                if k not in self.key2iter.keys():
+                    self.key2iter[k] = self.liststore.append(miter)
+                    miter = self.key2iter[k]
+                    self.liststore.set(self.key2iter[k], 0, keyname)
+
+                for i in l:
+
+                    keyname += "[" + str(i) + "]"
+                    k = (k, i)
+
+                    if k not in self.key2iter.keys():
+                        self.key2iter[k] = self.liststore.append(miter)
+                        miter = self.key2iter[k]
+                        self.liststore.set(self.key2iter[k], 0, keyname)
+
+                try:
+                    formula = self.store.formulas[k]
+                except:
+                    formula = "no formula"
+
+                try:
+                    keytype = type(self.store.values[k])
+                except:
+                    keytype = "no type"
+                    
+                try:
+                    value = self.store.values[k]
+                    if isinstance(value, ModuleType):                    
+                        l = self.store.store_eval("dir(" + k + ")")
+                        value = str(l)
+                    else:
+                        value = str(value)
+
+                except Exception as e:
+                    print e
+                    value = "no value"
+
+                self.liststore.set(self.key2iter[k], 0, keyname)
+                self.liststore.set(self.key2iter[k], 1, formula)
+                self.liststore.set(self.key2iter[k], 2, keytype)
+                self.liststore.set(self.key2iter[k], 3, value)
 
         if action == "delete":
             key = param
-            if key in self.key2iter.keys():
-                self.liststore.remove(self.key2iter[key])
-                del(self.key2iter[key])
+
+            if isinstance(key, tuple):
+                l = []
+                k = key
+                while isinstance(k, tuple):
+                    l.insert(0, k[1])
+                    k = k[0]
+
+            if isinstance(key, str):
+                if key in self.key2iter.keys():
+                    self.liststore.remove(self.key2iter[key])
+                    del(self.key2iter[key])
 
 
         return
