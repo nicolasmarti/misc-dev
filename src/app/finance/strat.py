@@ -142,7 +142,7 @@ class Strat():
             pass
 
         # just debug output
-        if st <> self.store["state"]:
+        if st <> self.store["state"] and False:
             print str(st) + " --> " + str(self.store["state"])
 
         # we are recording the pnl
@@ -160,7 +160,9 @@ class BackTest(Strat):
         if price == None:
             price = self.store["bars"][self.store["nb bars"] - 1]["ajust. close"]
         self.store["order"][self.store["nb bars"] - 1] = (size, price)
-        print "order: " + str((size, price)) + "@ " + str(self.store["bars"][self.store["nb bars"] - 1]["date"]) + " | " + str(self.store["nb bars"] - 1) + " ==> " + str(self.pnl_upnl())
+
+        if False:
+            print "order: " + str((size, price)) + "@ " + str(self.store["bars"][self.store["nb bars"] - 1]["date"]) + " | " + str(self.store["nb bars"] - 1) + " ==> " + str(self.pnl_upnl())
 
         if self.store["state"] == 1:
             self.store["state"] = 3
@@ -252,7 +254,9 @@ class Strat2(BackTest):
             else:
                 self.store["ema"][i]["period"] = self.store["ema"][i-1]["period"] * 2
         
-        print self.store["ema"]
+        if False:
+            print self.store["ema"]
+
         self.store["index"] = []
 
     def entry(self):
@@ -391,8 +395,12 @@ if __name__ == "__main__":
 
         bt.load(ticker + ".quotes")
 
+        print ticker
+
         bt.run()
     
         bt.store.save(open(ticker + ".log", "wb"))
 
-        print bt.store["final pnl"]
+        print str(bt.store["final pnl"]) + "\n"
+
+
