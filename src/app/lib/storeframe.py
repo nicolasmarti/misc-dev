@@ -195,11 +195,13 @@ class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
                 self.liststore.set(self.key2iter[key], 3, value)
 
             if isinstance(key, tuple):
+
                 l = []
                 k = key
                 while isinstance(k, tuple):
                     l.insert(0, k[1])
                     k = k[0]
+
 
                 keyname = str(k)
                 miter = None
@@ -208,16 +210,20 @@ class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
                     self.key2iter[k] = self.liststore.append(miter)
                     miter = self.key2iter[k]
                     self.liststore.set(self.key2iter[k], 0, keyname)
+                else:
+                    miter = self.key2iter[k]                    
 
                 for i in l:
 
                     keyname += "[" + str(i) + "]"
                     k = (k, i)
 
+
                     if k not in self.key2iter.keys():
                         self.key2iter[k] = self.liststore.append(miter)
                         miter = self.key2iter[k]
                         self.liststore.set(self.key2iter[k], 0, keyname)
+
 
                 try:
                     formula = self.store.formulas[k]
