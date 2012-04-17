@@ -339,12 +339,12 @@ class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
             self.store.__delitem__(varname)
 
     def mysort(self, treemodel, iter1, iter2, data = None):
-        val1 = treemodel.get(iter1, 0)
-        val2 = treemodel.get(iter2, 0)
+        val1 = (treemodel.get(iter1, 0))[0]
+        val2 = (treemodel.get(iter2, 0))[0]
 
         try:
             i1 = int(val1)
-        except:
+        except Exception as e:
             i1 = None
 
         try:
@@ -367,7 +367,6 @@ class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
             return 1
         else:
             return -1
-
 
         return 0
 
