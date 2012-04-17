@@ -45,8 +45,10 @@ class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         # view
         self.sw = gtk.ScrolledWindow()
         self.sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-
+        
         self.liststore = gtk.TreeStore(str, str, str, str)
+        self.liststore.set_sort_column_id(0, gtk.SORT_ASCENDING)
+
         self.treeview = gtk.TreeView(self.liststore)
 
         self.fields = ["key", "formula", "type", "value"]
@@ -193,6 +195,8 @@ class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
                 self.liststore.set(self.key2iter[key], 1, formula)
                 self.liststore.set(self.key2iter[key], 2, keytype)
                 self.liststore.set(self.key2iter[key], 3, value)
+                
+                return
 
             if isinstance(key, tuple):
 
@@ -218,12 +222,12 @@ class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
                     keyname += "[" + str(i) + "]"
                     k = (k, i)
 
-
                     if k not in self.key2iter.keys():
                         self.key2iter[k] = self.liststore.append(miter)
                         miter = self.key2iter[k]
                         self.liststore.set(self.key2iter[k], 0, keyname)
-
+                    else:
+                        miter = self.key2iter[k]                    
 
                 try:
                     formula = self.store.formulas[k]
@@ -252,6 +256,8 @@ class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
                 self.liststore.set(self.key2iter[k], 2, keytype)
                 self.liststore.set(self.key2iter[k], 3, value)
 
+                return
+
         if action == "delete":
             key = param
 
@@ -261,14 +267,14 @@ class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
                 while isinstance(k, tuple):
                     l.insert(0, k[1])
                     k = k[0]
+                return
 
             if isinstance(key, str):
                 if key in self.key2iter.keys():
                     self.liststore.remove(self.key2iter[key])
                     del(self.key2iter[key])
+                return
 
-
-        return
 
     def load(self):
         self.filew = gtk.FileSelection("File selection")

@@ -234,7 +234,7 @@ class EvalFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         self.get_settings().set_property("gtk-error-bell", False)
 
         # add the new print function
-        self.m_locals["mprint"] = self.myprint
+        #self.m_locals["mprint"] = self.myprint
 
     # a special print for here
     def myprint(self, s):
