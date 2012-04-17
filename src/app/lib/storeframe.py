@@ -48,6 +48,7 @@ class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
         
         self.liststore = gtk.TreeStore(str, str, str, str)
         self.liststore.set_sort_column_id(0, gtk.SORT_ASCENDING)
+        self.liststore.set_sort_func(0, self.mysort)
 
         self.treeview = gtk.TreeView(self.liststore)
 
@@ -219,7 +220,7 @@ class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
 
                 for i in l:
 
-                    keyname += "[" + str(i) + "]"
+                    keyname = str(i)
                     k = (k, i)
 
                     if k not in self.key2iter.keys():
@@ -336,6 +337,39 @@ class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
             piter = self.treeview.get_model().get_iter(path)
             varname = str(self.treeview.get_model().get_value(piter, 0))
             self.store.__delitem__(varname)
+
+    def mysort(self, treemodel, iter1, iter2, data = None):
+        val1 = treemodel.get(iter1, 0)
+        val2 = treemodel.get(iter2, 0)
+
+        try:
+            i1 = int(val1)
+        except:
+            i1 = None
+
+        try:
+            i2 = int(val2)
+        except:
+            i2 = None
+
+        if i1 <> None and i2 <> None:
+            return int.__cmp__(i1, i2)
+
+        if i1 == None and i2 == None:
+            if val1 < val2: 
+                return -1
+            elif val1 > val2:
+                return 1
+            else:
+                return 0
+        
+        if i1 == None:
+            return 1
+        else:
+            return -1
+
+
+        return 0
 
 if __name__ == '__main__':
     
