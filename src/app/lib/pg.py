@@ -215,7 +215,7 @@ class PG(gtksourceview2.View, keybinding.KeyBinding):
                     toadd.append(i)
 
             for i in toadd:
-                self.store[i] = "=" + self.modulename + "." + i 
+                self.store.__setitem__(i, "=" + self.modulename + "." + i) 
 
             self.added.append(toadd)
 
