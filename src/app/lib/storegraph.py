@@ -6,6 +6,8 @@ from pickle import *
 from string import join, ascii_uppercase
 import re
 
+from sets import *
+
 def colnum2colname(n):
     
     res = ""
@@ -87,7 +89,7 @@ class Storegraph:
         self.state = dict()
 
         # this is the stack of evaluated element
-        self.evaluation_stack = []
+        #self.evaluation_stack = []
 
         # a global lock on entry functions
         self.glock = Lock()
@@ -120,12 +122,19 @@ class Storegraph:
                 pass
         
             # we push the key on the stack
-            self.evaluation_stack.append(key)
+            #self.evaluation_stack.append(key)
 
             # we evaluate the formula with ourselves as local
             try:
-                value = eval(self.formulas[key], self._globals, self)
+                st = LogStore(self, key)
+                value = eval(self.formulas[key], self._globals, st)
                 # everything is fine, we update the value
+                #print "used := " + str(st.used)
+
+                for i in st.used:
+                    if not isinstance(self.values[i], PhantomStore):
+                        self.G.add_edge(i, key)
+
                 self.values[key] = value
 
             except Exception as e:
@@ -133,7 +142,7 @@ class Storegraph:
                 self.values[key] = e
 
             # we pop from the evaluation stack
-            self.evaluation_stack.pop()
+            #self.evaluation_stack.pop()
 
         # we set to clean
         self.state[key] = 1
@@ -257,32 +266,6 @@ class Storegraph:
     # getting a value
     def __getitem__(self, key):
 
-        #a special case: self
-        if key == "self":
-            return self
-
-        if key == "key":
-            return self.evaluation_stack[len(self.evaluation_stack) - 1]
-
-        if key == "value":
-            return self.values[self.evaluation_stack[len(self.evaluation_stack) - 1]]
-
-        if key == "row":
-            try:
-                mkey = self.evaluation_stack[len(self.evaluation_stack) - 1]                
-                return key2cell(mkey)[0]
-            except Exception as e:
-                print "key == row: " + str(e) 
-                return None
-
-        if key == "col":
-            try:
-                mkey = self.evaluation_stack[len(self.evaluation_stack) - 1]                
-                return key2cell(mkey)[1]
-            except Exception as e:
-                print "key == col: " + str(e) 
-                return None
-
         #print "evaluation_stack := " + str(self.evaluation_stack) 
 
         # if we do not have the key, then we create a phantom store
@@ -302,8 +285,6 @@ class Storegraph:
 
         # if the stack is not empty, then we need to add an edge from the top of the stack to the current key 
         # but only if the value is not an instance of phantomstore
-        if len(self.evaluation_stack) <> 0 and not isinstance(self.values[key], PhantomStore):
-            self.G.add_edge(key, self.evaluation_stack[len(self.evaluation_stack)-1])
 
         # and finally return the value
         return self.values[key]
@@ -381,7 +362,9 @@ class Storegraph:
 
     # eval
     def store_eval(self, cmd):
-        value = eval(cmd, globals(), self) 
+        st = LogStore(self)
+        value = eval(cmd, globals(), st) 
+        #print "used = " + str(st.used)
         return value
 
     # add a calllback
@@ -435,6 +418,52 @@ class Storegraph:
         for i in nx.topological_sort(self.G):
             #if self.formulas[i] <> None:
             self.update(i)
+
+# this class represent a logger store
+# it is created automatically in order to log the usage of store key for a given evaluation
+class LogStore:
+    def __init__(self, store, key = None):
+        self.store = store
+        
+        self.used = Set()
+
+        self.key = key
+
+    def __setitem__(self, key, item):
+        #self.used.add(key)
+        self.store[key] = item
+        return 
+    
+    def __getitem__(self, key):
+        #print "PhantomStore.__getitem__(" + str(key) + ")"
+
+        #a special case: self
+        if key == "self":
+            return self.store
+
+        if key == "key":
+            return self.key
+
+        if key == "value":
+            return self.store.values[self.key]
+
+        if key == "row":
+            try:
+                return key2cell(self.key)[0]
+            except Exception as e:
+                print "key == row: " + str(e) 
+                return None
+
+        if key == "col":
+            try:
+                return key2cell(self.key)[1]
+            except Exception as e:
+                print "key == col: " + str(e) 
+                return None
+
+        self.used.add(key)
+        return self.store[key]
+
 
 # this class represent a phantom store
 # created dynamically by the store in order to give shape to data
