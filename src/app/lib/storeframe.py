@@ -311,6 +311,13 @@ class StoreFrame(gtk.Frame, Thread, keybinding.KeyBinding):
 
     def local_clicked(self, treeview, path, viewcolumn, data):
 
+        #print str(type(path))
+        
+        piter = treeview.get_model().get_iter(path)
+        for i in path:
+            #print str(treeview.get_model().get_value(piter, 0))
+            piter = treeview.get_model().iter_parent(piter)
+
         piter = treeview.get_model().get_iter(path)
         varname = str(treeview.get_model().get_value(piter, 0))
         try:
