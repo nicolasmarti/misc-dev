@@ -461,6 +461,13 @@ class LogStore:
                 print "key == col: " + str(e) 
                 return None
 
+        if key not in self.store.state:
+            try:
+                return eval(key)
+            except:      
+                phantom = PhantomStore(name = key, store = self.store)
+                return phantom
+
         self.used.add(key)
         return self.store[key]
 
