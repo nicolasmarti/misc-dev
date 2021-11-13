@@ -1,0 +1,11 @@
+extern void object::Main(){
+
+    Robot r( this );
+
+    r.killing_bot( AlienSpider, 
+                 40,
+                 false,
+                 nan
+                 );
+
+}
